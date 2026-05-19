@@ -3,7 +3,7 @@
 A lightweight internal tool to enter, view, and roll forward weekly team schedules,
 including PTO (Paid Time Off) and UTO (Unpaid Time Off).
 
-- **Stack:** Python 3.13 · Streamlit · SQLite
+- **Stack:** Python 3.13 · Streamlit · SQLite (local/tests) / Postgres (prod)
 - **Model:** one shared instance; no per-user login, optional shared-password
   gate for public hosting (see [docs/PRD.md](docs/PRD.md))
 
@@ -30,8 +30,10 @@ pip install -r requirements.txt
 streamlit run app/Home.py
 ```
 
-DB defaults to `./data/scheduler.db`. Override with the `SCHEDULER_DB_PATH`
-env var. No password locally unless `SCHEDULER_PASSWORD` is set.
+DB backend is chosen by env: **`DATABASE_URL`** (Postgres) if set, else a
+local SQLite file (`./data/scheduler.db`, or `SCHEDULER_DB_PATH`). No
+password locally unless `SCHEDULER_PASSWORD` is set. The same code runs on
+both — tests run on SQLite.
 
 ## Test
 
@@ -39,46 +41,70 @@ env var. No password locally unless `SCHEDULER_PASSWORD` is set.
 pytest
 ```
 
-## Deploy (Render)
+## Deploy — Streamlit Community Cloud + free Postgres ($0)
 
-Single web service + a persistent disk keeps the shared SQLite file across
-restarts/redeploys. Config lives in [render.yaml](render.yaml).
+Free, persistent, no servers to manage. ~10 minutes.
 
-1. Push this repo to GitHub/GitLab.
-2. Render → **New → Blueprint** → pick the repo. It reads `render.yaml`:
-   a `starter` web service, a 1 GB disk mounted at `/var/scheduler-data`,
-   and `SCHEDULER_DB_PATH` pointed at it.
-3. Set **`SCHEDULER_PASSWORD`** in the Render dashboard (Environment tab).
-   Without it the app is open to anyone with the URL — see below.
-4. Deploy. Health check is `/_stcore/health`.
+**1. Create a free Postgres database.** Either works:
+- **Supabase** → New project → Settings → Database → copy the
+  **connection string** (URI). Use the *direct* connection.
+- **Neon** → New project → copy the `postgresql://...` connection string.
 
-**Why not Vercel:** Streamlit is a long-running websocket server and the
-app needs a persistent writable disk for SQLite — neither fits Vercel's
-serverless model. Render (or Fly.io/Railway) with a disk is the right fit.
+**2. Deploy the app.** Go to **share.streamlit.io** → sign in with GitHub →
+**Create app** → pick `helpflowdev/devscheduler`, branch `main`, main file
+`app/Home.py`.
+
+**3. Add secrets.** In the app's **⋮ → Settings → Secrets**, paste:
+
+```toml
+DATABASE_URL = "postgresql://user:pass@host:5432/dbname"
+SCHEDULER_PASSWORD = "pick-a-shared-password"
+```
+
+(`postgres://`/`postgresql://` are auto-normalized to the right driver.)
+
+**4. Save & deploy.** First load runs the schema migration automatically.
+You get a public URL like `https://<app>.streamlit.app` — that's where the
+team uses it. There's no extra cost; the free tiers cover a small team.
+
+If `DATABASE_URL` is missing the app falls back to an **ephemeral** SQLite
+file that resets on every redeploy — so the Postgres secret is what makes
+data persist. `SCHEDULER_PASSWORD` is required here, or the public URL is
+open to anyone (see Authentication).
+
+### Verify the database (recommended before first real use)
+
+Point the env var at your Postgres URL and run the self-check — it
+connects, migrates, and does a rolled-back round trip (writes nothing):
+
+```powershell
+$env:DATABASE_URL = "postgresql://user:pass@host:5432/dbname"
+.venv\Scripts\python.exe scripts/check_db.py   # prints "Database is ready."
+```
+
+> Note: the Postgres path is code-complete and the query logic is covered
+> by the test suite (run on SQLite), but it has **not** been exercised
+> against a live Postgres in this environment. `check_db.py` is that
+> confirmation — run it once after setting `DATABASE_URL`.
 
 ### Authentication
 
-The app itself has no per-user login (PRD design). On a public host this
-means a single **shared password** gate, enabled by setting
-`SCHEDULER_PASSWORD`. Treat it as a deterrent, not strong security; for
-anything sensitive put it behind a VPN/SSO proxy instead.
+No per-user login (PRD design) — a single **shared password** gate via
+`SCHEDULER_PASSWORD`. A deterrent, not strong security; for sensitive data
+put it behind SSO/VPN instead.
 
 ### Backups
 
-Render disks are durable but **not** auto-backed-up. Snapshot the DB from
-the Render Shell (or a scheduled job):
+Use your Postgres provider's built-in backups (Supabase/Neon both keep
+automatic backups / point-in-time on free tiers) or run `pg_dump` against
+`DATABASE_URL` on a schedule. `scripts/backup_db.py` is for the **local
+SQLite** file only.
 
-```bash
-python scripts/backup_db.py
-```
+### Alternative: Render with SQLite on a disk (paid)
 
-Writes a timestamped `scheduler-*.db` next to the live DB via SQLite's
-online backup API (safe while running). Download/copy snapshots off the
-instance for real disaster recovery.
+[render.yaml](render.yaml) is kept for a single paid Render service +
+persistent disk (no external DB, but ~$7/mo and single-instance). The
+Streamlit Cloud + Postgres path above is preferred for a free team deploy.
 
-### Scaling note
-
-One instance only (the disk binds to a single service); deploys cause
-brief downtime. Fine for one team. If you outgrow it, migrate the storage
-layer (`scheduler/db.py` + raw SQL) to managed Postgres — it's isolated by
-design.
+**Why not Vercel:** Streamlit is a long-running websocket server — it
+doesn't fit Vercel's serverless model regardless of database.

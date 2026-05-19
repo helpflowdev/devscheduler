@@ -1,3 +1,5 @@
 streamlit>=1.40
-tzdata>=2024.1   # zoneinfo tz database (required on Windows)
+SQLAlchemy>=2.0          # dialect-agnostic DB layer (SQLite local / Postgres prod)
+psycopg[binary]>=3.1     # Postgres driver (used when DATABASE_URL is set)
+tzdata>=2024.1           # zoneinfo tz database (required on Windows)
 pytest>=8.0

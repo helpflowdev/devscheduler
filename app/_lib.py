@@ -20,6 +20,26 @@ if str(_ROOT) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
+
+def _bridge_secrets() -> None:
+    """Expose Streamlit secrets as env vars before the DB layer reads them.
+
+    `scheduler.db` reads `DATABASE_URL` from `os.environ`. On Streamlit
+    Community Cloud you set these in the app's Secrets; this also makes a
+    local `.streamlit/secrets.toml` work. Real env vars win.
+    """
+    for key in ("DATABASE_URL", "SCHEDULER_PASSWORD"):
+        if os.environ.get(key):
+            continue
+        try:
+            if key in st.secrets:
+                os.environ[key] = str(st.secrets[key])
+        except Exception:
+            pass  # no secrets file locally — fine
+
+
+_bridge_secrets()
+
 from scheduler.db import connect  # noqa: E402
 from scheduler.models import Entry, EntryType  # noqa: E402
 

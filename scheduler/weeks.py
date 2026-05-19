@@ -6,11 +6,11 @@ The week starts Monday (PRD §11.1). ``copy_week`` is an exact copy (FR-5);
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from scheduler.config import DAY_NAMES  # noqa: F401  (re-exported)
+from scheduler.db import Connection
 from scheduler.errors import OverwriteRequiredError, ValidationError
 from scheduler.util import in_placeholders, now_iso
 
@@ -70,7 +70,7 @@ def shift_shift_times(
 
 
 def _copy_core(
-    conn: sqlite3.Connection,
+    conn: Connection,
     src_any_date: str | date,
     dst_any_date: str | date,
     overwrite: bool,
@@ -132,7 +132,7 @@ def _copy_core(
 
 
 def copy_week(
-    conn: sqlite3.Connection,
+    conn: Connection,
     src_any_date: str | date,
     dst_any_date: str | date,
     *,
@@ -148,7 +148,7 @@ def copy_week(
 
 
 def copy_week_with_offset(
-    conn: sqlite3.Connection,
+    conn: Connection,
     src_any_date: str | date,
     dst_any_date: str | date,
     offset_min: int,
@@ -176,7 +176,7 @@ class PreviewRow:
 
 
 def preview_offset(
-    conn: sqlite3.Connection,
+    conn: Connection,
     src_any_date: str | date,
     dst_any_date: str | date,
     offset_min: int,

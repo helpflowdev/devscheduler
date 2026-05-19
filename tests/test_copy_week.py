@@ -68,15 +68,18 @@ def test_overwrite_clears_destination_week(db):
 def test_copy_is_atomic_on_failure(db):
     """A failure mid-batch must roll the whole copy back (single txn)."""
     _seed(db)  # src → dst dates 2026-05-25 (Mon), 27 (Wed), 29 (Fri)
-    # Trigger aborts the *second* inserted row; the first must not persist.
-    db.executescript(
+    # SQLite trigger aborts the *second* inserted row; the first must not
+    # persist (single transaction). SQLite-only, which is the test backend.
+    db.execute(
         "CREATE TRIGGER boom BEFORE INSERT ON schedule_entry "
         "WHEN NEW.work_date = '2026-05-27' "
-        "BEGIN SELECT RAISE(ABORT, 'injected'); END;"
+        "BEGIN SELECT RAISE(ABORT, 'injected'); END"
     )
+    db.commit()
     try:
         with pytest.raises(Exception):
             copy_week(db, SRC, NXT)
         assert len(get_week_entries(db, NXT)) == 0  # fully rolled back
     finally:
-        db.executescript("DROP TRIGGER boom;")
+        db.execute("DROP TRIGGER boom")
+        db.commit()

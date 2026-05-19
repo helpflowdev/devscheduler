@@ -7,9 +7,9 @@ stay intact after someone is deactivated.
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 
+from scheduler.db import Connection
 from scheduler.errors import (
     NotFoundError,
     OverwriteRequiredError,
@@ -28,7 +28,7 @@ _INSERT_SQL = (
 
 
 def insert_entry(
-    conn: sqlite3.Connection,
+    conn: Connection,
     *,
     person_id: int,
     work_date: str,
@@ -46,7 +46,7 @@ def insert_entry(
     ))
 
 
-def get_week_entries(conn: sqlite3.Connection, any_date: str) -> list[Entry]:
+def get_week_entries(conn: Connection, any_date: str) -> list[Entry]:
     """All entries whose ``work_date`` falls in ``any_date``'s week."""
     dates = [iso(d) for d in week_dates(any_date)]
     rows = conn.execute(
@@ -59,7 +59,7 @@ def get_week_entries(conn: sqlite3.Connection, any_date: str) -> list[Entry]:
 
 
 def get_week_people(
-    conn: sqlite3.Connection,
+    conn: Connection,
     any_date: str,
     *,
     entries: list[Entry] | None = None,
@@ -132,7 +132,7 @@ def validate_shift_times(start: str, end: str) -> bool:
 
 
 def find_conflicts(
-    conn: sqlite3.Connection,
+    conn: Connection,
     dates: list[str],
     person_id: int | None = None,
 ) -> dict[str, list[Entry]]:
@@ -159,7 +159,7 @@ def find_conflicts(
 
 
 def apply_entry(
-    conn: sqlite3.Connection,
+    conn: Connection,
     person_id: int,
     dates: list[str],
     entry_type: EntryType,

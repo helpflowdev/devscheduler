@@ -7,14 +7,13 @@ for reuse. Inactive people are kept so historical weeks still resolve
 
 from __future__ import annotations
 
-import sqlite3
-
+from scheduler.db import Connection, IntegrityError
 from scheduler.errors import DuplicateNameError, NotFoundError, ValidationError
 from scheduler.models import Person
 from scheduler.util import now_iso
 
 
-def add_person(conn: sqlite3.Connection, name: str) -> Person:
+def add_person(conn: Connection, name: str) -> Person:
     """Create an active person.
 
     Raises ValidationError on blank name; DuplicateNameError if an active
@@ -27,21 +26,22 @@ def add_person(conn: sqlite3.Connection, name: str) -> Person:
         raise ValidationError("Name cannot be empty.")
 
     try:
-        cur = conn.execute(
-            "INSERT INTO person(name, is_active, created_at) VALUES (?, 1, ?)",
+        new_id = conn.execute(
+            "INSERT INTO person(name, is_active, created_at) "
+            "VALUES (?, 1, ?) RETURNING id",
             (clean, now_iso()),
-        )
+        ).fetchone()["id"]
         conn.commit()
-    except sqlite3.IntegrityError as exc:
+    except IntegrityError as exc:
         conn.rollback()
         raise DuplicateNameError(
             f"An active person named '{clean}' already exists."
         ) from exc
 
-    return get_person(conn, cur.lastrowid)
+    return get_person(conn, new_id)
 
 
-def get_person(conn: sqlite3.Connection, person_id: int) -> Person:
+def get_person(conn: Connection, person_id: int) -> Person:
     row = conn.execute(
         "SELECT id, name, is_active, created_at FROM person WHERE id = ?",
         (person_id,),
@@ -52,7 +52,7 @@ def get_person(conn: sqlite3.Connection, person_id: int) -> Person:
 
 
 def list_people(
-    conn: sqlite3.Connection, *, include_inactive: bool = False
+    conn: Connection, *, include_inactive: bool = False
 ) -> list[Person]:
     """Active people, name-sorted. With ``include_inactive`` returns all."""
     sql = "SELECT id, name, is_active, created_at FROM person"
@@ -62,7 +62,7 @@ def list_people(
     return [Person.from_row(r) for r in conn.execute(sql).fetchall()]
 
 
-def deactivate_person(conn: sqlite3.Connection, person_id: int) -> None:
+def deactivate_person(conn: Connection, person_id: int) -> None:
     """Hide a person from active lists; history is preserved (PRD §11.3)."""
     cur = conn.execute(
         "UPDATE person SET is_active = 0 WHERE id = ?", (person_id,)
