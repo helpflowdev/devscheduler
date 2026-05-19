@@ -112,9 +112,19 @@ if monday_of(jump) != anchor:
     st.session_state.anchor = monday_of(jump).isoformat()
     st.rerun()
 c_copy.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+# Remember the request in session state — the password prompt must
+# survive reruns (typing / reveal-eye), not live inside the click.
 if c_copy.button(f"⧉ Copy → wk {nxt_mon:%b %d}", disabled=not entries,
                  help="Copy this week's schedule into next week"):
-    require_edit_unlock("copy the schedule")
+    st.session_state["want_copy"] = True
+c_tz.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+manila = c_tz.toggle("Manila time")
+c_edit.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+edit_mode = c_edit.toggle("✏️ Edit")
+
+if st.session_state.get("want_copy"):
+    require_edit_unlock("copy the schedule")  # renders until unlocked
+    st.session_state.pop("want_copy", None)
     try:
         _do_copy(overwrite=False)
         st.rerun()
@@ -122,10 +132,6 @@ if c_copy.button(f"⧉ Copy → wk {nxt_mon:%b %d}", disabled=not entries,
         st.session_state.copy_pending = exc.conflicts
     except DomainError as exc:
         st.error(str(exc))
-c_tz.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
-manila = c_tz.toggle("Manila time")
-c_edit.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
-edit_mode = c_edit.toggle("✏️ Edit")
 
 _confirm_overwrite("copy_pending", _do_copy, show_detail=True)
 
