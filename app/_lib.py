@@ -47,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b12 · sidebar Light/Dark toggle (app-wide)"
+BUILD = "2026-05-19 · b13 · minimal dark-mode switch (sidebar bottom)"
 
 _FLASH_KEY = "_flash"
 
@@ -123,16 +123,18 @@ _THEME_CSS = {
 
 
 def theme_control() -> str:
-    """Visible Light/Dark switch in the sidebar (every page).
+    """Minimal dark-mode switch pinned to the bottom of the sidebar.
 
-    Returns "Dark"/"Light". Applies an app-wide CSS skin and is the single
-    source of truth for the overlap chart too. (Streamlit has no Python
-    API to flip its native theme, so this is a styling overlay — some
-    pop-ups/widgets keep default colors.)
+    Returns "Dark"/"Light"; also drives the overlap chart. Styling
+    overlay only (Streamlit has no Python API for its native theme), so a
+    few native pop-ups keep default colors.
     """
-    choice = st.sidebar.radio(
-        "Theme", ["Dark", "Light"], key="_app_theme", horizontal=True,
-    )
+    # Spacer pushes the switch into the lower part of the sidebar
+    # (robust across Streamlit versions — no internal-DOM selectors).
+    st.sidebar.markdown("<div style='height:55vh'></div>",
+                        unsafe_allow_html=True)
+    dark = st.sidebar.toggle("🌙 Dark mode", value=True, key="_app_dark")
+    choice = "Dark" if dark else "Light"
     st.markdown(f"<style>{_THEME_CSS[choice]}</style>",
                 unsafe_allow_html=True)
     return choice
