@@ -29,22 +29,22 @@ def _week(name: str, days: dict[int, tuple[str, str | None, str | None]]):
 # JC — 7:00 AM–3:00 PM Mon–Fri, RD Sat/Sun
 _week("JC", {**{d: (_S, "07:00", "15:00") for d in range(5)},
              5: (_RD, None, None), 6: (_RD, None, None)})
-# Gio — RD Mon, 11:00 AM–7:30 PM Tue–Fri, RD Sat, 9:00 AM–5:00 PM Sun
+# Gio — RD Mon, 11:00 AM–7:30 PM Tue–Fri, RD Sat/Sun
 _week("Gio", {0: (_RD, None, None),
               **{d: (_S, "11:00", "19:30") for d in (1, 2, 3, 4)},
-              5: (_RD, None, None), 6: (_S, "09:00", "17:00")})
-# Karim — RD Mon, 12–8 Tue–Fri, 9–5 Sat, 12–8 Sun
+              5: (_RD, None, None), 6: (_RD, None, None)})
+# Karim — RD Mon, 12–8 Tue–Fri, RD Sat, 12–8 Sun
 _week("Karim", {0: (_RD, None, None),
                 **{d: (_S, "12:00", "20:00") for d in (1, 2, 3, 4)},
-                5: (_S, "09:00", "17:00"), 6: (_S, "12:00", "20:00")})
+                5: (_RD, None, None), 6: (_S, "12:00", "20:00")})
 # Shierraine — 2–10 Mon–Thu, RD Fri/Sat, 2–10 Sun
 _week("Shierraine", {**{d: (_S, "14:00", "22:00") for d in range(4)},
                      4: (_RD, None, None), 5: (_RD, None, None),
                      6: (_S, "14:00", "22:00")})
-# Marion — RD Mon/Tue, 3:30 PM–12:00 AM Wed–Fri, RD Sat/Sun
+# Marion — RD Mon/Tue, 3:30 PM–12:00 AM Wed–Sat, RD Sun
 _week("Marion", {0: (_RD, None, None), 1: (_RD, None, None),
-                 **{d: (_S, "15:30", "00:00") for d in (2, 3, 4)},
-                 5: (_RD, None, None), 6: (_RD, None, None)})
+                 **{d: (_S, "15:30", "00:00") for d in (2, 3, 4, 5)},
+                 6: (_RD, None, None)})
 
 
 def ensure_person(conn: Connection, name: str) -> int:

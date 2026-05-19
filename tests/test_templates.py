@@ -38,6 +38,13 @@ def test_known_cells_match_screenshot(db):
     marion_wed = by[(pid["Marion"], "2026-05-20")]
     assert marion_wed.crosses_midnight is True  # 3:30 PM–12:00 AM
 
+    # Updated roster: Gio Sun RD, Karim Sat RD, Marion Sat works.
+    assert by[(pid["Gio"], "2026-05-24")].entry_type is EntryType.RD
+    assert by[(pid["Karim"], "2026-05-23")].entry_type is EntryType.RD
+    marion_sat = by[(pid["Marion"], "2026-05-23")]
+    assert (marion_sat.entry_type, marion_sat.start_time) == (
+        EntryType.SHIFT, "15:30")
+
 
 def test_ensure_person_is_idempotent(db):
     a = add_person(db, "Gio").id
