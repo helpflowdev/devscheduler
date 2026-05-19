@@ -13,6 +13,7 @@ from _lib import (  # noqa: E402  (sibling module; sets up sys.path)
     BUILD,
     get_db,
     render_conflicts,
+    require_edit_unlock,
     require_password,
     saved_message,
     set_flash,
@@ -92,6 +93,7 @@ if not people:
         "then schedule them in **Add Schedule**."
     )
 elif edit_mode:
+    require_edit_unlock("edit schedules")
     st.caption(
         "✏️ Edit mode — click a cell to change that day. "
         "Overlap & roll-forward are hidden while editing for speed."

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hmac
 import os
 import sys
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -28,7 +29,8 @@ def _bridge_secrets() -> None:
     Community Cloud you set these in the app's Secrets; this also makes a
     local `.streamlit/secrets.toml` work. Real env vars win.
     """
-    for key in ("DATABASE_URL", "SCHEDULER_PASSWORD"):
+    for key in ("DATABASE_URL", "SCHEDULER_PASSWORD",
+                "SCHEDULER_EDIT_PASSWORD", "SCHEDULER_EDIT_TTL_MIN"):
         if os.environ.get(key):
             continue
         try:
@@ -45,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b10 · smooth inline edit (fragment, no flicker)"
+BUILD = "2026-05-19 · b11 · edit password gate + native light/dark"
 
 _FLASH_KEY = "_flash"
 
@@ -101,6 +103,52 @@ def require_password() -> None:
             st.session_state["_authed"] = True
             st.rerun()
         st.error("Wrong password.")
+    st.stop()
+
+
+def edit_unlocked() -> bool:
+    """Is the current session allowed to edit?
+
+    True when no ``SCHEDULER_EDIT_PASSWORD`` is configured (no extra gate),
+    or it was entered this session. If ``SCHEDULER_EDIT_TTL_MIN`` is set,
+    the unlock expires that many minutes after it was entered.
+    """
+    pw = os.environ.get("SCHEDULER_EDIT_PASSWORD")
+    if not pw:
+        return True
+    at = st.session_state.get("_edit_ok_at")
+    if not at:
+        return False
+    ttl = os.environ.get("SCHEDULER_EDIT_TTL_MIN")
+    if ttl:
+        try:
+            if time.time() - at > float(ttl) * 60:
+                st.session_state.pop("_edit_ok_at", None)
+                return False
+        except ValueError:
+            pass
+    return True
+
+
+def require_edit_unlock(action: str = "make changes") -> None:
+    """Prompt for the edit password before an editing surface.
+
+    Per session by default (re-asked on refresh / new tab). Set
+    ``SCHEDULER_EDIT_TTL_MIN`` to also expire the unlock after N idle
+    minutes. No-op if ``SCHEDULER_EDIT_PASSWORD`` is unset. Halts the
+    script (``st.stop``) until unlocked.
+    """
+    pw = os.environ.get("SCHEDULER_EDIT_PASSWORD")
+    if not pw or edit_unlocked():
+        return
+    st.warning(f"🔒 Enter the edit password to {action}.")
+    entered = st.text_input("Edit password", type="password",
+                            key="_edit_pw")
+    if entered:
+        if hmac.compare_digest(entered, pw):
+            st.session_state["_edit_ok_at"] = time.time()
+            st.rerun()
+        st.error("Wrong edit password.")
     st.stop()
 
 

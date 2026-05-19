@@ -89,9 +89,24 @@ $env:DATABASE_URL = "postgresql://user:pass@host:5432/dbname"
 
 ### Authentication
 
-No per-user login (PRD design) — a single **shared password** gate via
-`SCHEDULER_PASSWORD`. A deterrent, not strong security; for sensitive data
-put it behind SSO/VPN instead.
+No per-user login (PRD design). Two optional shared passwords:
+
+- **`SCHEDULER_PASSWORD`** — asked once to open the app (view access).
+- **`SCHEDULER_EDIT_PASSWORD`** — asked again before any edit: the
+  Add Schedule / Manage People pages and Home's Edit mode. Per session
+  (re-asked on refresh / new tab / new browser). Set
+  **`SCHEDULER_EDIT_TTL_MIN`** (e.g. `10`) to also expire the unlock
+  after N idle minutes; leave unset for session-long (recommended).
+
+Both are deterrents, not strong security; for sensitive data put the app
+behind SSO/VPN as well.
+
+### Theme
+
+Brand blue accent is always on. Each viewer picks **Light / Dark / Use
+system** via the **☰ menu → Settings → Theme** (Streamlit's built-in
+switch — there's no in-page toggle for the whole app). The weekly-overlap
+chart has its own Dark/Light control since it's a custom chart.
 
 ### Backups
 

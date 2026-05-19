@@ -19,6 +19,7 @@ from _lib import (
     pick_duration,
     pick_time_12h,
     render_conflicts,
+    require_edit_unlock,
     require_password,
     saved_message,
     set_flash,
@@ -34,6 +35,7 @@ from scheduler.weeks import DAY_NAMES, end_from_duration, iso, week_dates
 st.set_page_config(page_title="Add Schedule", page_icon="📝")
 require_password()
 st.title("📝 Add Schedule")
+require_edit_unlock("add schedules")
 show_flash()
 
 ss = st.session_state
