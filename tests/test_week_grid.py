@@ -8,8 +8,25 @@ from pathlib import Path
 # week_grid lives in the app/ layer; make it importable for this unit test.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 
-from components.week_grid import format_cell  # noqa: E402
+from components.week_grid import format_cell, manila_cell_map  # noqa: E402
 from scheduler.models import Entry, EntryType  # noqa: E402
+
+
+def test_manila_map_splits_shift_across_two_days():
+    e = Entry(person_id=1, work_date="2026-05-18",  # Mon, PDT
+              entry_type=EntryType.SHIFT,
+              start_time="07:00", end_time="15:00")
+    cells = manila_cell_map([e])
+    # 7 AM–3 PM PDT → 10 PM Mon … 6 AM Tue (Manila, +15h).
+    assert cells[(1, "2026-05-18")] == ["10:00 PM–12:00 AM"]
+    assert cells[(1, "2026-05-19")] == ["12:00 AM–6:00 AM"]
+
+
+def test_manila_map_keeps_whole_day_on_its_date():
+    e = Entry(person_id=2, work_date="2026-05-18", entry_type=EntryType.RD)
+    cells = manila_cell_map([e])
+    assert list(cells) == [(2, "2026-05-18")]
+    assert "RD" in cells[(2, "2026-05-18")][0]
 
 
 def _shift(start, end, *, crosses=False):

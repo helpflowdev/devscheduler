@@ -52,6 +52,40 @@ def format_cell(entries: list[Entry], manila: bool) -> str:
     return "  ·  ".join(parts)
 
 
+def _badge_html(e: Entry) -> str:
+    bg, fg = TYPE_STYLE[e.entry_type.value]
+    return badge(f"{_EMOJI[e.entry_type]} {e.entry_type.value}", bg, fg)
+
+
+def manila_cell_map(entries: list[Entry]) -> dict:
+    """Re-bucket shifts onto their **Manila** day, splitting at midnight.
+
+    A 7 AM–3 PM Pacific shift becomes 10 PM–12 AM on its day and
+    12 AM–6 AM on the next day, each placed in the right Manila column.
+    Whole-day RD/PTO/UTO stay on their (Pacific) work date.
+    Returns {(person_id, "YYYY-MM-DD"): [html, …]}.
+    """
+    cells: dict = {}
+
+    def add(pid, iso, html):
+        cells.setdefault((pid, iso), []).append(html)
+
+    for e in entries:
+        if e.entry_type is not EntryType.SHIFT:
+            add(e.person_id, e.work_date, _badge_html(e))
+            continue
+        ms = pacific_to_manila(e.work_date, e.start_time)
+        me = pacific_to_manila(e.work_date, e.end_time)
+        s_iso, e_iso = ms.work_date.isoformat(), me.work_date.isoformat()
+        if s_iso == e_iso:
+            add(e.person_id, s_iso,
+                f"{to_12h(ms.time)}–{to_12h(me.time)}")
+        else:  # crosses Manila midnight → split across the two days
+            add(e.person_id, s_iso, f"{to_12h(ms.time)}–12:00 AM")
+            add(e.person_id, e_iso, f"12:00 AM–{to_12h(me.time)}")
+    return cells
+
+
 def _cell_html(entries: list[Entry], manila: bool) -> str:
     parts: list[str] = []
     for e in entries:
@@ -123,6 +157,9 @@ def render_week_grid(
         st.toast(st.session_state.pop("_grid_toast"))
 
     grid = index_by_person_date(entries)
+    # In Manila view, shifts are placed on their Manila day (split at
+    # midnight); whole-day entries stay put.
+    mcells = manila_cell_map(entries) if (manila and not edit_mode) else None
     tz_label = "Manila" if manila else "Pacific"
 
     header = st.columns([1.2] + [1] * 7)
@@ -147,6 +184,11 @@ def render_week_grid(
                                              use_container_width=True):
                         _cell_editor(person, iso,
                                      cell[0] if cell else None)
+                elif mcells is not None:
+                    pieces = mcells.get((person.id, iso), [])
+                    cols[i + 1].markdown(
+                        " · ".join(pieces) if pieces else "—",
+                        unsafe_allow_html=True)
                 else:
                     cols[i + 1].markdown(
                         _cell_html(cell, manila),
