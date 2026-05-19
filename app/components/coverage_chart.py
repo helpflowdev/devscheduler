@@ -21,6 +21,16 @@ _AXIS_LABEL = (
     "+(floor(datum.value/60)<12?' AM':' PM'))"
 )
 
+def _len(start_min: int, end_min: int) -> str:
+    """Bar duration as '8h' / '7h 30m'. Computed here so the chart never
+    depends on a Segment attribute (robust to a partial/stale deploy)."""
+    d = end_min - start_min
+    if d <= 0:
+        d += 24 * 60
+    h, m = divmod(d, 60)
+    return f"{h}h" + (f" {m}m" if m else "")
+
+
 # HelpFlow brand palette for bars (cycled across people).
 _BRAND_RANGE = ["#2EA3F2", "#FFE4B0", "#E1E0FF", "#C3EDFF", "#A6A6A6"]
 
@@ -83,7 +93,7 @@ def _draw_days(
         day_label = f"{DAY_NAMES[i]} {d.strftime('%m/%d')}"
         rows = [
             {"Person": s.person, "start": s.start_min, "end": s.end_min,
-             "Shift": s.label, "Length": s.length}
+             "Shift": s.label, "Length": _len(s.start_min, s.end_min)}
             for s in segs if s.work_date == iso
         ]
         with st.container(border=True):  # the per-day divider/box
