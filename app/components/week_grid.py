@@ -27,10 +27,9 @@ _EMOJI = {EntryType.PTO: "🌴", EntryType.UTO: "⚪", EntryType.RD: "💤"}
 
 
 def _manila_12h(work_date: str, hhmm: str) -> str:
-    mt = pacific_to_manila(work_date, hhmm)
-    off = "" if mt.day_offset == 0 else (
-        f" ({'+' if mt.day_offset > 0 else '-'}{abs(mt.day_offset)}d)")
-    return to_12h(mt.time) + off
+    # Show the Manila clock time as-is; the day shift is implied, no
+    # "(+1d)" clutter.
+    return to_12h(pacific_to_manila(work_date, hhmm).time)
 
 
 def _shift_text(e: Entry, manila: bool) -> str:

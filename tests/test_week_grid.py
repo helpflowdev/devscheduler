@@ -38,9 +38,10 @@ def test_shift_crosses_midnight_marker():
 
 
 def test_shift_manila_conversion_12h():
-    # 09:00 Pacific PDT + 15h = 00:00 next day Manila; 17:00 → 08:00 (+1d).
+    # 09:00 Pacific PDT +15h → 12:00 AM Manila; 17:00 → 8:00 AM.
+    # Day shift is implied — no "(+1d)" suffix.
     cell = format_cell([_shift("09:00", "17:00")], manila=True)
-    assert cell == "12:00 AM (+1d)–8:00 AM (+1d)"
+    assert cell == "12:00 AM–8:00 AM"
 
 
 def test_badges_pto_uto_rd():

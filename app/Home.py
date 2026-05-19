@@ -59,19 +59,75 @@ if nav_today.button("Today"):
     st.rerun()
 
 days = week_dates(anchor)
+nxt_mon = add_weeks(anchor, 1)
 nav_label.markdown(
     f"### Week of {days[0].strftime('%b %d')} – {days[-1].strftime('%b %d, %Y')}"
 )
 
-ctrl_jump, ctrl_tz, ctrl_edit = st.columns([2, 1, 1])
-jump = ctrl_jump.date_input("Jump to date", value=anchor)
+with get_db() as conn:
+    entries = get_week_entries(conn, anchor.isoformat())
+    people = get_week_people(conn, anchor.isoformat(), entries=entries)
+
+
+def _do_copy(*, overwrite: bool) -> None:
+    with get_db() as conn:
+        res = copy_week(conn, anchor.isoformat(), nxt_mon.isoformat(),
+                        overwrite=overwrite)
+    set_flash(saved_message(
+        f"Copied into the week of {nxt_mon:%b %d} —",
+        res.copied, res.overwritten))
+    st.session_state.pop("copy_pending", None)
+    st.session_state.anchor = nxt_mon.isoformat()
+
+
+def _confirm_overwrite(state_key: str, do_fn, *, show_detail: bool) -> None:
+    pending = st.session_state.get(state_key)
+    if not pending:
+        return
+    n = sum(len(v) for v in pending.values())
+    st.warning(
+        f"The week of {nxt_mon:%b %d} already has "
+        f"{n} entr{'y' if n == 1 else 'ies'}. "
+        "Overwriting clears that whole week first."
+    )
+    if show_detail:
+        render_conflicts(pending)
+    ow, cancel = st.columns([2, 1])
+    if ow.button("Overwrite next week & continue", key=f"ow_{state_key}",
+                 type="primary"):
+        try:
+            do_fn(overwrite=True)
+            st.rerun()
+        except DomainError as exc:
+            st.error(str(exc))
+    if cancel.button("Cancel", key=f"cancel_{state_key}"):
+        st.session_state.pop(state_key, None)
+        st.rerun()
+
+
+# Top controls: narrow date jump · copy-forward · Manila · Edit.
+c_jump, c_copy, c_tz, c_edit, _sp = st.columns([1.4, 1.7, 1, 1, 3])
+jump = c_jump.date_input("Jump to date", value=anchor)
 if monday_of(jump) != anchor:
     st.session_state.anchor = monday_of(jump).isoformat()
     st.rerun()
-manila = ctrl_tz.toggle(
-    "Manila time", help="Converts Pacific shift times per date (DST-aware).")
-edit_mode = ctrl_edit.toggle(
-    "✏️ Edit", help="Click any cell to add, change, or delete that day.")
+c_copy.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+if c_copy.button(f"⧉ Copy → wk {nxt_mon:%b %d}", disabled=not entries,
+                 help="Copy this week's schedule into next week"):
+    require_edit_unlock("copy the schedule")
+    try:
+        _do_copy(overwrite=False)
+        st.rerun()
+    except OverwriteRequiredError as exc:
+        st.session_state.copy_pending = exc.conflicts
+    except DomainError as exc:
+        st.error(str(exc))
+c_tz.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+manila = c_tz.toggle("Manila time")
+c_edit.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+edit_mode = c_edit.toggle("✏️ Edit")
+
+_confirm_overwrite("copy_pending", _do_copy, show_detail=True)
 
 st.divider()
 
@@ -87,10 +143,6 @@ def _edit_grid(anchor_iso: str, manila: bool) -> None:
     if not ents:
         st.caption("No entries this week yet.")
 
-
-with get_db() as conn:
-    entries = get_week_entries(conn, anchor.isoformat())
-    people = get_week_people(conn, anchor.isoformat(), entries=entries)
 
 if not people:
     st.info(
@@ -120,62 +172,6 @@ else:
         "Hover a bar for its length."
     )
     render_overlap(entries, people, days, theme=app_theme)
-
-    st.divider()
-    nxt_mon = add_weeks(anchor, 1)
-
-    def _confirm_overwrite(state_key: str, do_fn, *, show_detail: bool) -> None:
-        pending = st.session_state.get(state_key)
-        if not pending:
-            return
-        n = sum(len(v) for v in pending.values())
-        st.warning(
-            f"The week of {nxt_mon:%b %d} already has "
-            f"{n} entr{'y' if n == 1 else 'ies'}. "
-            "Overwriting clears that whole week first."
-        )
-        if show_detail:
-            render_conflicts(pending)
-        ow, cancel = st.columns([2, 1])
-        if ow.button("Overwrite next week & continue", key=f"ow_{state_key}",
-                     type="primary"):
-            try:
-                do_fn(overwrite=True)
-                st.rerun()
-            except DomainError as exc:
-                st.error(str(exc))
-        if cancel.button("Cancel", key=f"cancel_{state_key}"):
-            st.session_state.pop(state_key, None)
-            st.rerun()
-
-    # Keep this schedule — exact copy into next week (FR-5).
-    st.subheader("Keep this schedule")
-    st.caption(
-        f"Copy the week of {days[0]:%b %d} into the next week "
-        f"(of {nxt_mon:%b %d}), keeping each weekday."
-    )
-
-    def _do_copy(*, overwrite: bool) -> None:
-        with get_db() as conn:
-            res = copy_week(conn, anchor.isoformat(), nxt_mon.isoformat(),
-                            overwrite=overwrite)
-        set_flash(saved_message(
-            f"Copied into the week of {nxt_mon:%b %d} —",
-            res.copied, res.overwritten))
-        st.session_state.pop("copy_pending", None)
-        st.session_state.anchor = nxt_mon.isoformat()
-
-    if st.button("Copy this week → next week ▶", type="primary",
-                 disabled=not entries):
-        try:
-            _do_copy(overwrite=False)
-            st.rerun()
-        except OverwriteRequiredError as exc:
-            st.session_state.copy_pending = exc.conflicts
-        except DomainError as exc:
-            st.error(str(exc))
-
-    _confirm_overwrite("copy_pending", _do_copy, show_detail=True)
 
 st.divider()
 st.caption(f"build: {BUILD}")
