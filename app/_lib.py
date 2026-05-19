@@ -47,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b16 · default weekly schedule template"
+BUILD = "2026-05-19 · b17 · dark-mode: all buttons visible"
 
 _FLASH_KEY = "_flash"
 
@@ -116,10 +116,14 @@ _THEME_CSS = {
         "[data-testid='stSidebar']{background-color:#1E2147}"
         ".stApp h1,.stApp h2,.stApp h3,.stApp p,.stApp label,"
         ".stApp .stMarkdown{color:#FFFFFF}"
-        # secondary / nav / popover buttons: navy so white label shows
-        ".stApp [data-testid='stBaseButton-secondary'],"
-        ".stApp [data-testid='stPopoverButton']"
-        "{background-color:#1E2147;color:#FFFFFF;border:1px solid #3A3F6B}"
+        # Every button navy w/ white label (covers secondary, form-submit,
+        # popover, etc.) so none are white-on-white…
+        ".stApp button{background-color:#1E2147!important;"
+        "color:#FFFFFF!important;border:1px solid #3A3F6B!important}"
+        ".stApp button *{color:#FFFFFF!important}"
+        # …but keep primary (Save/Apply) on brand blue.
+        ".stApp [data-testid='stBaseButton-primary']{"
+        "background-color:#2EA3F2!important;border-color:#2EA3F2!important}"
         + _COMMON_CSS
     ),
     "Light": (
