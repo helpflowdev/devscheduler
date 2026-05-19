@@ -10,6 +10,7 @@ from datetime import date
 import streamlit as st
 
 from _lib import (  # noqa: E402  (sibling module; sets up sys.path)
+    BUILD,
     get_db,
     render_conflicts,
     require_password,
@@ -221,3 +222,6 @@ else:
                     st.error(str(exc))
 
             _confirm_overwrite("offset_pending", _do_offset, show_detail=False)
+
+st.divider()
+st.caption(f"build: {BUILD}")
