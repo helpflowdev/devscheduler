@@ -69,7 +69,10 @@ def order_by_shift_start(
     """
     earliest: dict[int, int] = {}
     for e in entries:
-        if e.entry_type is EntryType.SHIFT and e.start_time:
+        # Value compare (not enum identity) so this can't silently no-op
+        # across environments/enum quirks.
+        is_shift = getattr(e.entry_type, "value", e.entry_type) == "SHIFT"
+        if is_shift and e.start_time:
             h, m = e.start_time.split(":")
             mins = int(h) * 60 + int(m)
             cur = earliest.get(e.person_id)
