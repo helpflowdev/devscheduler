@@ -58,22 +58,49 @@ def get_week_entries(conn: Connection, any_date: str) -> list[Entry]:
     return [Entry.from_row(r) for r in rows]
 
 
+def order_by_shift_start(
+    people: list[Person], entries: list[Entry]
+) -> list[Person]:
+    """Roster order: earliest shift-start first, then whole-day/none,
+    name as the tiebreaker.
+
+    Each person gets the minimum SHIFT start time across the week's
+    entries; people with no shift sort after those who do.
+    """
+    earliest: dict[int, int] = {}
+    for e in entries:
+        if e.entry_type is EntryType.SHIFT and e.start_time:
+            h, m = e.start_time.split(":")
+            mins = int(h) * 60 + int(m)
+            cur = earliest.get(e.person_id)
+            if cur is None or mins < cur:
+                earliest[e.person_id] = mins
+
+    def key(p: Person):
+        if p.id in earliest:
+            return (0, earliest[p.id], p.name.lower())
+        return (1, 0, p.name.lower())
+
+    return sorted(people, key=key)
+
+
 def get_week_people(
     conn: Connection,
     any_date: str,
     *,
     entries: list[Entry] | None = None,
 ) -> list[Person]:
-    """Active people ∪ inactive-with-entries-this-week, name-sorted.
+    """Active people ∪ inactive-with-entries-this-week.
 
-    Pass ``entries`` (already loaded for the same week) to skip the
-    correlated re-scan of schedule_entry.
+    With ``entries`` (already loaded for the week) rows are ordered by
+    earliest shift start that week (then name); this also skips the
+    correlated re-scan. Without ``entries``, name-sorted.
     """
     if entries is not None:
         with_entries = {e.person_id for e in entries}
         rows = conn.execute(
             "SELECT id, name, is_active, created_at FROM person "
-            "WHERE is_active = 1 ORDER BY lower(name)"
+            "WHERE is_active = 1"
         ).fetchall()
         people = [Person.from_row(r) for r in rows]
         seen = {p.id for p in people}
@@ -85,8 +112,7 @@ def get_week_people(
                 list(extra_ids),
             ).fetchall()
             people += [Person.from_row(r) for r in rows]
-            people.sort(key=lambda p: p.name.lower())
-        return people
+        return order_by_shift_start(people, entries)
 
     dates = [iso(d) for d in week_dates(any_date)]
     rows = conn.execute(

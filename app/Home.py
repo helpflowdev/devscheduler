@@ -76,7 +76,7 @@ with get_db() as conn:
 if not people:
     st.info(
         "No people yet. Add your team in **Manage People** (sidebar), "
-        "then schedule them in **Add or Edit**."
+        "then schedule them in **Add Schedule**."
     )
 else:
     render_week_grid(people, entries, days, manila=manila)

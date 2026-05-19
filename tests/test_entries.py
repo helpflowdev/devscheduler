@@ -7,7 +7,40 @@ from scheduler.entries import (
     get_week_people,
     index_by_person_date,
 )
+from scheduler.models import Entry, EntryType
 from scheduler.people import add_person, deactivate_person
+
+
+def _shift(pid, d, start):
+    return Entry(person_id=pid, work_date=d, entry_type=EntryType.SHIFT,
+                 start_time=start, end_time="23:00")
+
+
+def test_people_ordered_by_earliest_shift_start(db):
+    a = add_person(db, "Aaron")   # alphabetically first…
+    z = add_person(db, "Zoe")     # …but starts earlier
+    add_person(db, "Mia")         # no shift → after the shift workers
+    ents = [
+        _shift(a.id, "2026-05-19", "13:00"),
+        _shift(z.id, "2026-05-18", "07:00"),
+    ]
+    order = [p.name for p in
+             get_week_people(db, "2026-05-18", entries=ents)]
+    assert order[:2] == ["Zoe", "Aaron"]      # by start, not alphabetical
+    assert order[-1] == "Mia"                 # no shift → last
+
+
+def test_earliest_across_week_used(db):
+    p = add_person(db, "Pat")
+    q = add_person(db, "Quinn")
+    ents = [
+        _shift(p.id, "2026-05-18", "10:00"),
+        _shift(p.id, "2026-05-20", "06:00"),  # Pat's earliest = 06:00
+        _shift(q.id, "2026-05-19", "08:00"),
+    ]
+    order = [x.name for x in
+             get_week_people(db, "2026-05-18", entries=ents)]
+    assert order == ["Pat", "Quinn"]
 
 
 def _add_shift(db, person_id, work_date, start="09:00", end="17:00"):

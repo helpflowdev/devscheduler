@@ -1,7 +1,8 @@
-"""Add or Edit schedule (US-2, US-3).
+"""Add schedule (US-2, US-3).
 
 Step 1 — pick a person and the date(s)/week.
-Step 2 — pick the type (Shift / PTO / UTO) and, for shifts, the times.
+Step 2 — pick the type (Shift / PTO / UTO / RD) and, for shifts, the times.
+(Per-entry editing/deleting lives on the Edit or Delete page.)
 
 Bulk-applies one entry to every selected date; existing entries on those
 dates are listed and require an explicit overwrite confirm (FR-3, FR-4).
@@ -30,9 +31,9 @@ from scheduler.people import add_person, list_people
 from scheduler.timefmt import to_12h
 from scheduler.weeks import DAY_NAMES, end_from_duration, iso, week_dates
 
-st.set_page_config(page_title="Add or Edit", page_icon="📝")
+st.set_page_config(page_title="Add Schedule", page_icon="📝")
 require_password()
-st.title("📝 Add or Edit Schedule")
+st.title("📝 Add Schedule")
 show_flash()
 
 ss = st.session_state

@@ -43,8 +43,12 @@ def _day_chart(rows: list[dict], theme: dict):
                 ),
             ),
             x2="end:Q",
-            y=alt.Y("Person:N", title=None,
-                    axis=alt.Axis(labelLimit=140)),
+            y=alt.Y(
+                "Person:N", title=None,
+                axis=alt.Axis(labelLimit=140),
+                sort=alt.EncodingSortField(
+                    field="start", op="min", order="ascending"),
+            ),
             color=alt.Color("Person:N", legend=None),
             tooltip=["Person", "Shift"],
         )
