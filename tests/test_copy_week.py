@@ -8,7 +8,22 @@ from scheduler.entries import apply_entry, get_week_entries
 from scheduler.errors import OverwriteRequiredError, ValidationError
 from scheduler.models import EntryType
 from scheduler.people import add_person
-from scheduler.weeks import copy_week
+from scheduler.weeks import clear_week, copy_week
+
+
+def test_clear_week_removes_only_that_week(db):
+    p = add_person(db, "Zoe")
+    apply_entry(db, p.id, ["2026-05-18", "2026-05-20"], EntryType.SHIFT,
+                start_time="09:00", end_time="17:00")
+    apply_entry(db, p.id, ["2026-05-25"], EntryType.PTO)  # next week
+    removed = clear_week(db, "2026-05-18")
+    assert removed == 2
+    assert get_week_entries(db, "2026-05-18") == []
+    assert len(get_week_entries(db, "2026-05-25")) == 1  # untouched
+
+
+def test_clear_empty_week_is_noop(db):
+    assert clear_week(db, "2026-05-18") == 0
 
 SRC = "2026-05-18"  # Monday
 NXT = "2026-05-25"  # next Monday

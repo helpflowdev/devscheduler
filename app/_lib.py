@@ -47,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b20 · fix Copy-week password prompt"
+BUILD = "2026-05-19 · b21 · Clear button, layout + dark header"
 
 _FLASH_KEY = "_flash"
 
@@ -124,6 +124,13 @@ _THEME_CSS = {
         # …but keep primary (Save/Apply) on brand blue.
         ".stApp [data-testid='stBaseButton-primary']{"
         "background-color:#2EA3F2!important;border-color:#2EA3F2!important}"
+        # Blend the top header into the page (no white band) and make its
+        # icons (Share / star / ⋮ …) visible on navy.
+        "[data-testid='stHeader']{background:transparent!important}"
+        "[data-testid='stHeader'] button,"
+        "[data-testid='stHeader'] a{color:#FFFFFF!important}"
+        "[data-testid='stHeader'] svg{fill:#FFFFFF!important;"
+        "color:#FFFFFF!important}"
         + _COMMON_CSS
     ),
     "Light": (

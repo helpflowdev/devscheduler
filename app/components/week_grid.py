@@ -125,7 +125,7 @@ def render_week_grid(
     grid = index_by_person_date(entries)
     tz_label = "Manila" if manila else "Pacific"
 
-    header = st.columns([2] + [1] * 7)
+    header = st.columns([1.2] + [1] * 7)
     header[0].markdown(f"**Person** · _{tz_label}_")
     for i, d in enumerate(week_days):
         header[i + 1].markdown(
@@ -134,7 +134,7 @@ def render_week_grid(
 
     for person in people:
         with st.container(border=True):  # light border per person row
-            cols = st.columns([2] + [1] * 7)
+            cols = st.columns([1.2] + [1] * 7)
             name = (person.name if person.is_active
                     else f"{person.name} (inactive)")
             cols[0].markdown(f"**{name}**")

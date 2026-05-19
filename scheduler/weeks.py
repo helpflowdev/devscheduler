@@ -152,3 +152,19 @@ def copy_week(
     ``overwrite`` clears the destination week first (PRD §9).
     """
     return _copy_core(conn, src_any_date, dst_any_date, overwrite)
+
+
+def clear_week(conn: Connection, any_date_in_week) -> int:
+    """Delete every entry (all people) in that week. Returns rows removed."""
+    dates = [iso(d) for d in week_dates(monday_of(any_date_in_week))]
+    try:
+        cur = conn.execute(
+            f"DELETE FROM schedule_entry "
+            f"WHERE work_date IN ({in_placeholders(7)})",
+            dates,
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return cur.rowcount

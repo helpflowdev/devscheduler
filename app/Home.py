@@ -29,6 +29,7 @@ from scheduler.entries import get_week_entries, get_week_people  # noqa: E402
 from scheduler.errors import DomainError, OverwriteRequiredError  # noqa: E402
 from scheduler.weeks import (  # noqa: E402
     add_weeks,
+    clear_week,
     copy_week,
     monday_of,
     week_dates,
@@ -47,7 +48,8 @@ anchor = monday_of(st.session_state.anchor)
 st.title("📅 Team Schedule Viewer")
 show_flash()
 
-nav_prev, nav_label, nav_next, nav_today = st.columns([1, 3, 1, 1])
+nav_prev, nav_label, nav_next, nav_today, _navsp = st.columns(
+    [1, 3.4, 1, 1, 4])
 if nav_prev.button("◀ Prev"):
     st.session_state.anchor = add_weeks(anchor, -1).isoformat()
     st.rerun()
@@ -105,22 +107,29 @@ def _confirm_overwrite(state_key: str, do_fn, *, show_detail: bool) -> None:
         st.rerun()
 
 
-# Top controls: narrow date jump · copy-forward · Manila · Edit.
-c_jump, c_copy, c_tz, c_edit, _sp = st.columns([1.4, 1.7, 1, 1, 3])
+_VSPACE = "<div style='height:1.7em'></div>"
+
+# Order: Jump · Manila · Edit · Copy · Clear.
+c_jump, c_tz, c_edit, c_copy, c_clear, _sp = st.columns(
+    [1.5, 1, 0.9, 1.7, 1.4, 3])
 jump = c_jump.date_input("Jump to date", value=anchor)
 if monday_of(jump) != anchor:
     st.session_state.anchor = monday_of(jump).isoformat()
     st.rerun()
-c_copy.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
+c_tz.markdown(_VSPACE, unsafe_allow_html=True)
+manila = c_tz.toggle("Manila time")
+c_edit.markdown(_VSPACE, unsafe_allow_html=True)
+edit_mode = c_edit.toggle("✏️ Edit")
+c_copy.markdown(_VSPACE, unsafe_allow_html=True)
 # Remember the request in session state — the password prompt must
 # survive reruns (typing / reveal-eye), not live inside the click.
 if c_copy.button(f"⧉ Copy → wk {nxt_mon:%b %d}", disabled=not entries,
                  help="Copy this week's schedule into next week"):
     st.session_state["want_copy"] = True
-c_tz.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
-manila = c_tz.toggle("Manila time")
-c_edit.markdown("<div style='height:1.7em'></div>", unsafe_allow_html=True)
-edit_mode = c_edit.toggle("✏️ Edit")
+c_clear.markdown(_VSPACE, unsafe_allow_html=True)
+if c_clear.button("🗑 Clear week", disabled=not entries,
+                  help="Delete every entry in this week"):
+    st.session_state["want_clear"] = True
 
 if st.session_state.get("want_copy"):
     require_edit_unlock("copy the schedule")  # renders until unlocked
@@ -134,6 +143,30 @@ if st.session_state.get("want_copy"):
         st.error(str(exc))
 
 _confirm_overwrite("copy_pending", _do_copy, show_detail=True)
+
+if st.session_state.get("want_clear"):
+    require_edit_unlock("clear the week")
+    n = len(entries)
+    st.warning(
+        f"Delete all {n} entr{'y' if n == 1 else 'ies'} for the week of "
+        f"{days[0]:%b %d}? This can't be undone."
+    )
+    yes_c, no_c = st.columns([1, 1])
+    if yes_c.button("Yes, clear week", type="primary", key="do_clear"):
+        try:
+            with get_db() as conn:
+                removed = clear_week(conn, anchor.isoformat())
+            set_flash(
+                f"Cleared {removed} entr{'y' if removed == 1 else 'ies'} "
+                f"for the week of {days[0]:%b %d}."
+            )
+        except DomainError as exc:
+            st.error(str(exc))
+        st.session_state.pop("want_clear", None)
+        st.rerun()
+    if no_c.button("Cancel", key="cancel_clear"):
+        st.session_state.pop("want_clear", None)
+        st.rerun()
 
 st.divider()
 
