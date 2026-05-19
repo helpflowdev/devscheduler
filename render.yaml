@@ -1,0 +1,29 @@
+# Render Blueprint — deploy with: Render dashboard → New → Blueprint
+# (or `render blueprint launch`). One web service + a persistent disk so
+# the shared SQLite file survives restarts/redeploys.
+services:
+  - type: web
+    name: team-schedule-viewer
+    runtime: python
+    plan: starter            # persistent disks require a paid plan
+    buildCommand: pip install -r requirements.txt
+    startCommand: >-
+      streamlit run app/Home.py
+      --server.port $PORT
+      --server.address 0.0.0.0
+      --server.headless true
+      --server.enableCORS false
+      --server.enableXsrfProtection false
+    healthCheckPath: /_stcore/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: SCHEDULER_DB_PATH
+        value: /var/scheduler-data/scheduler.db
+      - key: SCHEDULER_PASSWORD   # set in the Render dashboard (not in git)
+        sync: false
+    disk:
+      name: scheduler-data
+      mountPath: /var/scheduler-data
+      sizeGB: 1

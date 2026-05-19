@@ -1,0 +1,9 @@
+[project]
+name = "team-schedule-viewer"
+version = "0.1.0"
+description = "Internal team schedule viewer (Streamlit + SQLite)"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "scheduler/tz.py"]
+addopts = "-q --doctest-modules"
