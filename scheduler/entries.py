@@ -222,6 +222,32 @@ def apply_entry(
     return ApplyResult(created=len(dates), overwritten=overwritten)
 
 
+def delete_entries(
+    conn: Connection, person_id: int, dates: list[str]
+) -> int:
+    """Delete ``person_id``'s entries on ``dates``. Returns rows removed.
+
+    Single transaction. Idempotent — deleting a date with no entry is a
+    no-op (returns a smaller count), not an error.
+    """
+    if not dates:
+        raise ValidationError("Select at least one date.")
+    try:
+        removed = 0
+        for d in dates:
+            cur = conn.execute(
+                "DELETE FROM schedule_entry "
+                "WHERE person_id = ? AND work_date = ?",
+                (person_id, d),
+            )
+            removed += cur.rowcount
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return removed
+
+
 def index_by_person_date(
     entries: list[Entry],
 ) -> dict[tuple[int, str], list[Entry]]:

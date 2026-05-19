@@ -123,6 +123,25 @@ def pick_time_12h(label: str, key: str, default_hhmm: str) -> str:
     return f"{h24:02d}:{minute}"
 
 
+def pick_duration(key: str, default_min: int = 480) -> int:
+    """Shift length as hours + minutes (5-min steps). Returns minutes.
+
+    Default 8h. Used instead of an end-time picker — pick when it starts
+    and how long it runs; the end is derived (handles overnight cleanly).
+    """
+    dh, dm = divmod(default_min, 60)
+    minutes = [f"{i:02d}" for i in range(0, 60, 5)]
+    c1, c2 = st.columns(2)
+    hours = c1.number_input(
+        "Hours", min_value=0, max_value=23, value=dh, key=f"{key}_dh"
+    )
+    mins = c2.selectbox(
+        "Minutes", minutes,
+        index=(dm // 5) if dm % 5 == 0 else 0, key=f"{key}_dm",
+    )
+    return int(hours) * 60 + int(mins)
+
+
 def saved_message(verb: str, created: int, overwritten: int) -> str:
     """Uniform 'Saved N entries (replaced M).' style message."""
     tail = f" (replaced {overwritten})." if overwritten else "."

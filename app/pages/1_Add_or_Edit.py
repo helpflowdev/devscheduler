@@ -15,6 +15,7 @@ import streamlit as st
 
 from _lib import (
     get_db,
+    pick_duration,
     pick_time_12h,
     render_conflicts,
     require_password,
@@ -26,7 +27,8 @@ from scheduler.entries import apply_entry
 from scheduler.errors import DomainError, OverwriteRequiredError
 from scheduler.models import EntryType
 from scheduler.people import add_person, list_people
-from scheduler.weeks import DAY_NAMES, iso, week_dates
+from scheduler.timefmt import to_12h
+from scheduler.weeks import DAY_NAMES, end_from_duration, iso, week_dates
 
 st.set_page_config(page_title="Add or Edit", page_icon="📝")
 require_password()
@@ -122,10 +124,17 @@ else:
     if entry_type is EntryType.SHIFT:
         st.caption("Start (Pacific)")
         start_str = pick_time_12h("Hour", "ae_start", "09:00")
-        st.caption("End (Pacific)")
-        end_str = pick_time_12h("Hour", "ae_end", "17:00")
-        if end_str <= start_str:
-            st.caption("⏭ Ends on/after midnight — will be flagged overnight.")
+        st.caption("Length")
+        dur = pick_duration("ae_dur", 480)
+        try:
+            end_str, crosses = end_from_duration(start_str, dur)
+            st.caption(
+                f"→ Ends **{to_12h(end_str)}**"
+                + (" (next day ⏭)" if crosses else "")
+            )
+        except DomainError as exc:
+            end_str = None
+            st.warning(str(exc))
     note = st.text_input("Note (optional)")
 
     nav_back, nav_save = st.columns([1, 2])

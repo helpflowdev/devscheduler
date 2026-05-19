@@ -57,6 +57,31 @@ def _to_hhmm(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
+def end_from_duration(start: str, dur_min: int) -> tuple[str, bool]:
+    """Given a start ``HH:MM`` and a duration in minutes, return
+    ``(end_hhmm, crosses_midnight)``.
+
+    The duration model: pick when it starts and how long it runs; the end
+    (and whether it spills past midnight) is derived — no error-prone
+    end-time entry.
+    """
+    if dur_min <= 0:
+        raise ValidationError("Duration must be greater than zero.")
+    if dur_min >= 24 * 60:
+        raise ValidationError("A shift must be shorter than 24 hours.")
+    total = _to_min(start) + dur_min
+    return _to_hhmm(total), total >= 24 * 60
+
+
+def duration_minutes(start: str, end: str, crosses_midnight: bool) -> int:
+    """Inverse of :func:`end_from_duration` — length of an existing shift,
+    used to pre-fill the duration when editing."""
+    span = _to_min(end) - _to_min(start)
+    if crosses_midnight or span <= 0:
+        span += 24 * 60
+    return span
+
+
 def shift_shift_times(
     start: str, end: str, offset_min: int
 ) -> tuple[str, str, bool]:

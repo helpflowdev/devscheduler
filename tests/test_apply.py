@@ -6,6 +6,7 @@ import pytest
 
 from scheduler.entries import (
     apply_entry,
+    delete_entries,
     find_conflicts,
     get_week_entries,
     validate_shift_times,
@@ -85,6 +86,27 @@ def test_rd_rejects_times(db):
     with pytest.raises(ValidationError):
         apply_entry(db, p.id, ["2026-05-18"], EntryType.RD,
                     start_time="09:00", end_time="17:00")
+
+
+def test_delete_entries_removes_only_target(db):
+    p = add_person(db, "Del")
+    apply_entry(db, p.id, ["2026-05-18", "2026-05-19"], EntryType.SHIFT,
+                start_time="09:00", end_time="17:00")
+    removed = delete_entries(db, p.id, ["2026-05-18"])
+    assert removed == 1
+    left = get_week_entries(db, "2026-05-18")
+    assert [e.work_date for e in left] == ["2026-05-19"]
+
+
+def test_delete_missing_date_is_noop(db):
+    p = add_person(db, "Non")
+    assert delete_entries(db, p.id, ["2026-05-18"]) == 0
+
+
+def test_delete_no_dates_rejected(db):
+    p = add_person(db, "Emp")
+    with pytest.raises(ValidationError):
+        delete_entries(db, p.id, [])
 
 
 def test_no_dates_rejected(db):
