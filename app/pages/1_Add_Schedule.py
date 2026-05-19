@@ -24,6 +24,7 @@ from _lib import (
     saved_message,
     set_flash,
     show_flash,
+    theme_control,
 )
 from scheduler.entries import apply_entry
 from scheduler.errors import DomainError, OverwriteRequiredError
@@ -33,6 +34,7 @@ from scheduler.timefmt import to_12h
 from scheduler.weeks import DAY_NAMES, end_from_duration, iso, week_dates
 
 st.set_page_config(page_title="Add Schedule", page_icon="📝")
+theme_control()
 require_password()
 st.title("📝 Add Schedule")
 require_edit_unlock("add schedules")

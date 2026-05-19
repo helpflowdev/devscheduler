@@ -18,6 +18,7 @@ from _lib import (  # noqa: E402  (sibling module; sets up sys.path)
     saved_message,
     set_flash,
     show_flash,
+    theme_control,
 )
 from components.coverage_chart import render_overlap  # noqa: E402
 from components.week_grid import render_week_grid  # noqa: E402
@@ -32,6 +33,7 @@ from scheduler.weeks import (  # noqa: E402
 
 st.set_page_config(page_title="Team Schedule Viewer", page_icon="📅",
                    layout="wide")
+app_theme = theme_control()
 require_password()
 
 if "anchor" not in st.session_state:
@@ -105,17 +107,12 @@ else:
         st.caption("No entries this week yet.")
 
     st.divider()
-    head, appear = st.columns([3, 1])
-    head.subheader("Weekly overlap")
-    chart_theme = appear.radio(
-        "Appearance", ["Dark", "Light"], horizontal=True,
-        label_visibility="collapsed",
-    )
+    st.subheader("Weekly overlap")
     st.caption(
         "Each bar is a shift. Each day is boxed; bars lined up vertically "
         "within a day's box are people working at the same time."
     )
-    render_overlap(entries, people, days, theme=chart_theme)
+    render_overlap(entries, people, days, theme=app_theme)
 
     st.divider()
     nxt_mon = add_weeks(anchor, 1)

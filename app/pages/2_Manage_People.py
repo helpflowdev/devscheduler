@@ -14,11 +14,13 @@ from _lib import (
     require_password,
     set_flash,
     show_flash,
+    theme_control,
 )
 from scheduler.errors import DomainError
 from scheduler.people import add_person, deactivate_person, list_people
 
 st.set_page_config(page_title="Manage People", page_icon="👥")
+theme_control()
 require_password()
 st.title("👥 Manage People")
 require_edit_unlock("manage people")

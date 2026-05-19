@@ -47,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b11 · edit password gate + native light/dark"
+BUILD = "2026-05-19 · b12 · sidebar Light/Dark toggle (app-wide)"
 
 _FLASH_KEY = "_flash"
 
@@ -104,6 +104,38 @@ def require_password() -> None:
             st.rerun()
         st.error("Wrong password.")
     st.stop()
+
+
+_THEME_CSS = {
+    "Dark": (
+        ".stApp{background-color:#111229;color:#FFFFFF}"
+        "[data-testid='stSidebar']{background-color:#1E2147}"
+        ".stApp h1,.stApp h2,.stApp h3,.stApp p,.stApp label,"
+        ".stApp .stMarkdown{color:#FFFFFF}"
+    ),
+    "Light": (
+        ".stApp{background-color:#FFFFFF;color:#111229}"
+        "[data-testid='stSidebar']{background-color:#F2F3FF}"
+        ".stApp h1,.stApp h2,.stApp h3,.stApp p,.stApp label,"
+        ".stApp .stMarkdown{color:#111229}"
+    ),
+}
+
+
+def theme_control() -> str:
+    """Visible Light/Dark switch in the sidebar (every page).
+
+    Returns "Dark"/"Light". Applies an app-wide CSS skin and is the single
+    source of truth for the overlap chart too. (Streamlit has no Python
+    API to flip its native theme, so this is a styling overlay — some
+    pop-ups/widgets keep default colors.)
+    """
+    choice = st.sidebar.radio(
+        "Theme", ["Dark", "Light"], key="_app_theme", horizontal=True,
+    )
+    st.markdown(f"<style>{_THEME_CSS[choice]}</style>",
+                unsafe_allow_html=True)
+    return choice
 
 
 def edit_unlocked() -> bool:
