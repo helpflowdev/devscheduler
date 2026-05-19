@@ -83,7 +83,7 @@ def test_preview_does_not_write(db):
 
     shifts = [r for r in rows if r.entry_type == "SHIFT"]
     pto = [r for r in rows if r.entry_type == "PTO"]
-    assert any(r.old == "09:00–17:00" and r.new == "10:00–18:00"
+    assert any(r.old == "9:00 AM–5:00 PM" and r.new == "10:00 AM–6:00 PM"
                for r in shifts)
     assert pto and pto[0].old == "" and pto[0].new == ""
     assert all(r.dst_date.startswith("2026-05-2") or

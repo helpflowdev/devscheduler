@@ -9,16 +9,21 @@ from enum import Enum
 class EntryType(str, Enum):
     """Type of a schedule entry.
 
-    SHIFT requires start/end times. PTO/UTO are whole-day with no times.
+    SHIFT requires start/end times. PTO/UTO/RD are whole-day, no times.
     """
 
     SHIFT = "SHIFT"
     PTO = "PTO"  # Paid Time Off
     UTO = "UTO"  # Unpaid Time Off
+    RD = "RD"   # Rest Day (scheduled day off, not leave)
 
     @property
     def is_time_off(self) -> bool:
         return self in (EntryType.PTO, EntryType.UTO)
+
+    @property
+    def needs_times(self) -> bool:
+        return self is EntryType.SHIFT
 
 
 @dataclass(slots=True)

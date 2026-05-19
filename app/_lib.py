@@ -42,6 +42,7 @@ _bridge_secrets()
 
 from scheduler.db import connect  # noqa: E402
 from scheduler.models import Entry, EntryType  # noqa: E402
+from scheduler.timefmt import range_12h  # noqa: E402
 
 _FLASH_KEY = "_flash"
 
@@ -92,10 +93,34 @@ def entries_phrase(n: int) -> str:
 
 
 def entry_detail(e: Entry) -> str:
-    """How an existing entry reads in a conflict list."""
+    """How an existing entry reads in a conflict list (12-hour)."""
     if e.entry_type is EntryType.SHIFT:
-        return f"{e.start_time}–{e.end_time}"
+        return range_12h(e.start_time, e.end_time)
     return e.entry_type.value
+
+
+def pick_time_12h(label: str, key: str, default_hhmm: str) -> str:
+    """12-hour AM/PM time picker (Streamlit's time_input is 24h-only).
+
+    Returns canonical 24-hour ``"HH:MM"``. Minutes in 5-min steps.
+    """
+    dh, dm = (int(x) for x in default_hhmm.split(":"))
+    minutes = [f"{i:02d}" for i in range(0, 60, 5)]
+    c1, c2, c3 = st.columns(3)
+    hour = c1.selectbox(
+        label, list(range(1, 13)),
+        index=(dh % 12 or 12) - 1, key=f"{key}_h",
+    )
+    minute = c2.selectbox(
+        "Min", minutes,
+        index=(dm // 5) if dm % 5 == 0 else 0, key=f"{key}_m",
+    )
+    ampm = c3.selectbox(
+        "AM/PM", ["AM", "PM"],
+        index=0 if dh < 12 else 1, key=f"{key}_ap",
+    )
+    h24 = hour % 12 + (12 if ampm == "PM" else 0)
+    return f"{h24:02d}:{minute}"
 
 
 def saved_message(verb: str, created: int, overwritten: int) -> str:

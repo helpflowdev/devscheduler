@@ -27,8 +27,9 @@ def test_empty_cell():
     assert format_cell([], manila=False) == ""
 
 
-def test_shift_pacific():
-    assert format_cell([_shift("09:00", "17:00")], manila=False) == "09:00–17:00"
+def test_shift_pacific_12h():
+    assert format_cell([_shift("09:00", "17:00")],
+                       manila=False) == "9:00 AM–5:00 PM"
 
 
 def test_shift_crosses_midnight_marker():
@@ -36,14 +37,17 @@ def test_shift_crosses_midnight_marker():
                                manila=False)
 
 
-def test_shift_manila_conversion():
-    # 09:00 Pacific PDT + 15h = 00:00 next day Manila.
+def test_shift_manila_conversion_12h():
+    # 09:00 Pacific PDT + 15h = 00:00 next day Manila; 17:00 → 08:00 (+1d).
     cell = format_cell([_shift("09:00", "17:00")], manila=True)
-    assert cell == "00:00 (+1d)–08:00 (+1d)"
+    assert cell == "12:00 AM (+1d)–8:00 AM (+1d)"
 
 
-def test_pto_and_uto_badges():
-    pto = Entry(person_id=1, work_date="2026-07-01", entry_type=EntryType.PTO)
-    uto = Entry(person_id=1, work_date="2026-07-01", entry_type=EntryType.UTO)
-    assert "PTO" in format_cell([pto], manila=False)
-    assert "UTO" in format_cell([uto], manila=False)
+def test_badges_pto_uto_rd():
+    for et, tag in (
+        (EntryType.PTO, "PTO"),
+        (EntryType.UTO, "UTO"),
+        (EntryType.RD, "RD"),
+    ):
+        e = Entry(person_id=1, work_date="2026-07-01", entry_type=et)
+        assert tag in format_cell([e], manila=False)

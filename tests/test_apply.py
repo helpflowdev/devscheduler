@@ -71,6 +71,22 @@ def test_pto_applies_with_no_times(db):
     assert res.created == 1
 
 
+def test_rd_applies_with_no_times(db):
+    p = add_person(db, "Rey")
+    res = apply_entry(db, p.id, ["2026-05-18"], EntryType.RD)
+    assert res.created == 1
+    row = get_week_entries(db, "2026-05-18")[0]
+    assert row.entry_type is EntryType.RD
+    assert row.start_time is None and row.end_time is None
+
+
+def test_rd_rejects_times(db):
+    p = add_person(db, "Rio")
+    with pytest.raises(ValidationError):
+        apply_entry(db, p.id, ["2026-05-18"], EntryType.RD,
+                    start_time="09:00", end_time="17:00")
+
+
 def test_no_dates_rejected(db):
     p = add_person(db, "Eve")
     with pytest.raises(ValidationError):

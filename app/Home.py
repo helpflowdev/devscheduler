@@ -17,6 +17,7 @@ from _lib import (  # noqa: E402  (sibling module; sets up sys.path)
     set_flash,
     show_flash,
 )
+from components.coverage_chart import render_overlap  # noqa: E402
 from components.week_grid import render_week_grid  # noqa: E402
 from scheduler.entries import get_week_entries, get_week_people  # noqa: E402
 from scheduler.errors import DomainError, OverwriteRequiredError  # noqa: E402
@@ -81,6 +82,14 @@ else:
     render_week_grid(people, entries, days, manila=manila)
     if not entries:
         st.caption("No entries this week yet.")
+
+    st.divider()
+    st.subheader("Weekly overlap")
+    st.caption(
+        "Each bar is a shift. Bars lined up vertically on the same day "
+        "are people working at the same time."
+    )
+    render_overlap(entries, people, days)
 
     st.divider()
     nxt_mon = add_weeks(anchor, 1)

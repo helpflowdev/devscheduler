@@ -10,17 +10,30 @@ import streamlit as st
 
 from scheduler.entries import index_by_person_date
 from scheduler.models import Entry, EntryType, Person
+from scheduler.timefmt import range_12h, to_12h
 from scheduler.tz import pacific_to_manila
 from scheduler.weeks import DAY_NAMES
+
+_BADGES = {
+    EntryType.PTO: "🌴 PTO",
+    EntryType.UTO: "⚪ UTO",
+    EntryType.RD: "💤 RD",
+}
+
+
+def _manila_12h(work_date: str, hhmm: str) -> str:
+    mt = pacific_to_manila(work_date, hhmm)
+    off = "" if mt.day_offset == 0 else f" ({'+' if mt.day_offset > 0 else '-'}"\
+        f"{abs(mt.day_offset)}d)"
+    return to_12h(mt.time) + off
 
 
 def _shift_text(e: Entry, manila: bool) -> str:
     if not manila:
-        body = f"{e.start_time}–{e.end_time}"
+        body = range_12h(e.start_time, e.end_time)
     else:
-        start = pacific_to_manila(e.work_date, e.start_time)
-        end = pacific_to_manila(e.work_date, e.end_time)
-        body = f"{start.label()}–{end.label()}"
+        body = (f"{_manila_12h(e.work_date, e.start_time)}–"
+                f"{_manila_12h(e.work_date, e.end_time)}")
     # ⏭ flags a shift that crosses midnight (distinct from the Manila
     # day-offset, which the label already shows as "(+1d)").
     return f"{body} ⏭" if e.crosses_midnight else body
@@ -32,10 +45,8 @@ def format_cell(entries: list[Entry], manila: bool) -> str:
     for e in entries:
         if e.entry_type is EntryType.SHIFT:
             parts.append(_shift_text(e, manila))
-        elif e.entry_type is EntryType.PTO:
-            parts.append("🌴 PTO")
-        else:  # UTO
-            parts.append("⚪ UTO")
+        else:
+            parts.append(_BADGES[e.entry_type])
     return "  ·  ".join(parts)
 
 

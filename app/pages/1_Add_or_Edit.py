@@ -9,12 +9,13 @@ dates are listed and require an explicit overwrite confirm (FR-3, FR-4).
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date
 
 import streamlit as st
 
 from _lib import (
     get_db,
+    pick_time_12h,
     render_conflicts,
     require_password,
     saved_message,
@@ -119,11 +120,10 @@ else:
 
     start_str = end_str = None
     if entry_type is EntryType.SHIFT:
-        c1, c2 = st.columns(2)
-        start_t = c1.time_input("Start (Pacific)", value=time(9, 0))
-        end_t = c2.time_input("End (Pacific)", value=time(17, 0))
-        start_str = start_t.strftime("%H:%M")
-        end_str = end_t.strftime("%H:%M")
+        st.caption("Start (Pacific)")
+        start_str = pick_time_12h("Hour", "ae_start", "09:00")
+        st.caption("End (Pacific)")
+        end_str = pick_time_12h("Hour", "ae_end", "17:00")
         if end_str <= start_str:
             st.caption("⏭ Ends on/after midnight — will be flagged overnight.")
     note = st.text_input("Note (optional)")

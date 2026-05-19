@@ -58,7 +58,7 @@ def list_people(
     sql = "SELECT id, name, is_active, created_at FROM person"
     if not include_inactive:
         sql += " WHERE is_active = 1"
-    sql += " ORDER BY name COLLATE NOCASE"
+    sql += " ORDER BY lower(name)"
     return [Person.from_row(r) for r in conn.execute(sql).fetchall()]
 
 

@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from scheduler.config import DAY_NAMES  # noqa: F401  (re-exported)
 from scheduler.db import Connection
 from scheduler.errors import OverwriteRequiredError, ValidationError
+from scheduler.timefmt import range_12h
 from scheduler.util import in_placeholders, now_iso
 
 
@@ -189,7 +190,7 @@ def preview_offset(
         "SELECT e.*, p.name AS person_name FROM schedule_entry e "
         "JOIN person p ON p.id = e.person_id "
         f"WHERE e.work_date IN ({in_placeholders(7)}) "
-        "ORDER BY p.name COLLATE NOCASE, e.work_date",
+        "ORDER BY lower(p.name), e.work_date",
         src_dates,
     ).fetchall()
 
@@ -206,6 +207,6 @@ def preview_offset(
         )
         out.append(PreviewRow(
             r["person_name"], new_date, "SHIFT",
-            f'{r["start_time"]}–{r["end_time"]}', f"{s}–{e}",
+            range_12h(r["start_time"], r["end_time"]), range_12h(s, e),
         ))
     return out

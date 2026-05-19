@@ -73,7 +73,7 @@ def get_week_people(
         with_entries = {e.person_id for e in entries}
         rows = conn.execute(
             "SELECT id, name, is_active, created_at FROM person "
-            "WHERE is_active = 1 ORDER BY name COLLATE NOCASE"
+            "WHERE is_active = 1 ORDER BY lower(name)"
         ).fetchall()
         people = [Person.from_row(r) for r in rows]
         seen = {p.id for p in people}
@@ -94,7 +94,7 @@ def get_week_people(
         "WHERE is_active = 1 "
         "   OR id IN (SELECT DISTINCT person_id FROM schedule_entry "
         f"             WHERE work_date IN ({in_placeholders(len(dates))})) "
-        "ORDER BY name COLLATE NOCASE",
+        "ORDER BY lower(name)",
         dates,
     ).fetchall()
     return [Person.from_row(r) for r in rows]

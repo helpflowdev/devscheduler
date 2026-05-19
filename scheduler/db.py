@@ -29,7 +29,7 @@ DEFAULT_DB_PATH = Path(
     )
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Per-dialect migration statements (each a list of single statements).
 _MIGRATIONS: list[dict[str, list[str]]] = [
@@ -117,6 +117,85 @@ _MIGRATIONS: list[dict[str, list[str]]] = [
             "DROP INDEX IF EXISTS ux_person_active_name",
             """CREATE UNIQUE INDEX ux_person_active_name
                 ON person(lower(name)) WHERE is_active = 1""",
+        ],
+    },
+    # --- v3: add the RD (Rest Day) entry type ------------------------------
+    # CHECK can't be altered in place, so rebuild schedule_entry. The times
+    # rule is generalized to "SHIFT has times, anything else doesn't".
+    {
+        "sqlite": [
+            "ALTER TABLE schedule_entry RENAME TO schedule_entry_old",
+            """CREATE TABLE schedule_entry (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                person_id        INTEGER NOT NULL REFERENCES person(id),
+                work_date        TEXT    NOT NULL,
+                entry_type       TEXT    NOT NULL
+                                 CHECK (entry_type IN
+                                        ('SHIFT','PTO','UTO','RD')),
+                start_time       TEXT,
+                end_time         TEXT,
+                crosses_midnight INTEGER NOT NULL DEFAULT 0
+                                 CHECK (crosses_midnight IN (0, 1)),
+                note             TEXT,
+                created_at       TEXT    NOT NULL,
+                updated_at       TEXT    NOT NULL,
+                CHECK (
+                    (entry_type = 'SHIFT'
+                         AND start_time IS NOT NULL AND end_time IS NOT NULL)
+                    OR (entry_type <> 'SHIFT'
+                         AND start_time IS NULL AND end_time IS NULL)
+                )
+            )""",
+            """INSERT INTO schedule_entry (id, person_id, work_date,
+                   entry_type, start_time, end_time, crosses_midnight,
+                   note, created_at, updated_at)
+               SELECT id, person_id, work_date, entry_type, start_time,
+                   end_time, crosses_midnight, note, created_at, updated_at
+               FROM schedule_entry_old""",
+            "DROP TABLE schedule_entry_old",
+            """CREATE INDEX IF NOT EXISTS ix_entry_person_date
+                ON schedule_entry(person_id, work_date)""",
+            """CREATE INDEX IF NOT EXISTS ix_entry_date
+                ON schedule_entry(work_date)""",
+        ],
+        "postgresql": [
+            "ALTER TABLE schedule_entry RENAME TO schedule_entry_old",
+            """CREATE TABLE schedule_entry (
+                id               BIGSERIAL PRIMARY KEY,
+                person_id        BIGINT  NOT NULL REFERENCES person(id),
+                work_date        TEXT    NOT NULL,
+                entry_type       TEXT    NOT NULL
+                                 CHECK (entry_type IN
+                                        ('SHIFT','PTO','UTO','RD')),
+                start_time       TEXT,
+                end_time         TEXT,
+                crosses_midnight SMALLINT NOT NULL DEFAULT 0
+                                 CHECK (crosses_midnight IN (0, 1)),
+                note             TEXT,
+                created_at       TEXT    NOT NULL,
+                updated_at       TEXT    NOT NULL,
+                CHECK (
+                    (entry_type = 'SHIFT'
+                         AND start_time IS NOT NULL AND end_time IS NOT NULL)
+                    OR (entry_type <> 'SHIFT'
+                         AND start_time IS NULL AND end_time IS NULL)
+                )
+            )""",
+            """INSERT INTO schedule_entry (id, person_id, work_date,
+                   entry_type, start_time, end_time, crosses_midnight,
+                   note, created_at, updated_at)
+               SELECT id, person_id, work_date, entry_type, start_time,
+                   end_time, crosses_midnight, note, created_at, updated_at
+               FROM schedule_entry_old""",
+            "DROP TABLE schedule_entry_old",
+            """SELECT setval(
+                   pg_get_serial_sequence('schedule_entry','id'),
+                   COALESCE((SELECT MAX(id) FROM schedule_entry), 0) + 1,
+                   false)""",
+            """CREATE INDEX IF NOT EXISTS ix_entry_person_date
+                ON schedule_entry(person_id, work_date)""",
+            """CREATE INDEX IF NOT EXISTS ix_entry_date
+                ON schedule_entry(work_date)""",
         ],
     },
 ]
