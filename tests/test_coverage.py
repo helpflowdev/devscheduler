@@ -20,6 +20,7 @@ def test_plain_shift_one_segment():
     s = segs[0]
     assert (s.person, s.start_min, s.end_min) == ("Alice", 540, 1020)
     assert s.label == "9:00 AM–5:00 PM"
+    assert s.length == "8h"
 
 
 def test_overnight_splits_into_two_segments():
@@ -28,6 +29,13 @@ def test_overnight_splits_into_two_segments():
     spans = sorted((s.start_min, s.end_min) for s in segs)
     assert spans == [(0, 120), (1320, 1440)]
     assert all(s.label == "10:00 PM–2:00 AM" for s in segs)
+    assert all(s.length == "4h" for s in segs)  # whole-shift length
+
+
+def test_length_includes_minutes():
+    segs = week_shift_segments(
+        [_shift(1, "2026-05-18", "09:00", "17:30")], NAMES)
+    assert segs[0].length == "8h 30m"
 
 
 def test_non_shift_entries_ignored():

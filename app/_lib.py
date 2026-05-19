@@ -47,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b13 · minimal dark-mode switch (sidebar bottom)"
+BUILD = "2026-05-19 · b14 · shift length + popup + dark button fix"
 
 _FLASH_KEY = "_flash"
 
@@ -106,18 +106,28 @@ def require_password() -> None:
     st.stop()
 
 
+# Hide Streamlit's per-element toolbar (the oversized fullscreen +
+# raw "Show data"); we provide a sized popup instead.
+_COMMON_CSS = "[data-testid='stElementToolbar']{display:none}"
+
 _THEME_CSS = {
     "Dark": (
         ".stApp{background-color:#111229;color:#FFFFFF}"
         "[data-testid='stSidebar']{background-color:#1E2147}"
         ".stApp h1,.stApp h2,.stApp h3,.stApp p,.stApp label,"
         ".stApp .stMarkdown{color:#FFFFFF}"
+        # secondary / nav / popover buttons: navy so white label shows
+        ".stApp [data-testid='stBaseButton-secondary'],"
+        ".stApp [data-testid='stPopoverButton']"
+        "{background-color:#1E2147;color:#FFFFFF;border:1px solid #3A3F6B}"
+        + _COMMON_CSS
     ),
     "Light": (
         ".stApp{background-color:#FFFFFF;color:#111229}"
         "[data-testid='stSidebar']{background-color:#F2F3FF}"
         ".stApp h1,.stApp h2,.stApp h3,.stApp p,.stApp label,"
         ".stApp .stMarkdown{color:#111229}"
+        + _COMMON_CSS
     ),
 }
 
@@ -131,7 +141,7 @@ def theme_control() -> str:
     """
     # Spacer pushes the switch into the lower part of the sidebar
     # (robust across Streamlit versions — no internal-DOM selectors).
-    st.sidebar.markdown("<div style='height:55vh'></div>",
+    st.sidebar.markdown("<div style='height:72vh'></div>",
                         unsafe_allow_html=True)
     dark = st.sidebar.toggle("🌙 Dark mode", value=True, key="_app_dark")
     choice = "Dark" if dark else "Light"

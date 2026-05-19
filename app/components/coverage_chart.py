@@ -55,7 +55,7 @@ def _day_chart(rows: list[dict], theme: dict):
             color=alt.Color(
                 "Person:N", legend=None,
                 scale=alt.Scale(range=_BRAND_RANGE)),
-            tooltip=["Person", "Shift"],
+            tooltip=["Person", "Shift", "Length"],
         )
         .properties(height=alt.Step(22))
         .configure_view(stroke=None, fill=theme["bg"])
@@ -68,9 +68,8 @@ def _day_chart(rows: list[dict], theme: dict):
     )
 
 
-def render_overlap(
-    entries: list[Entry], people: list[Person], week_days,
-    *, theme: str = "Dark",
+def _draw_days(
+    entries: list[Entry], people: list[Person], week_days, theme: str,
 ) -> None:
     name_by_id = {p.id: p.name for p in people}
     segs = week_shift_segments(entries, name_by_id)
@@ -84,7 +83,7 @@ def render_overlap(
         day_label = f"{DAY_NAMES[i]} {d.strftime('%m/%d')}"
         rows = [
             {"Person": s.person, "start": s.start_min, "end": s.end_min,
-             "Shift": s.label}
+             "Shift": s.label, "Length": s.length}
             for s in segs if s.work_date == iso
         ]
         with st.container(border=True):  # the per-day divider/box
@@ -95,3 +94,18 @@ def render_overlap(
                 st.altair_chart(_day_chart(rows, th), width="stretch")
             else:
                 st.caption("No shifts.")
+
+
+def render_overlap(
+    entries: list[Entry], people: list[Person], week_days,
+    *, theme: str = "Dark",
+) -> None:
+    _draw_days(entries, people, week_days, theme)
+
+
+@st.dialog("Weekly overlap", width="large")
+def overlap_dialog(
+    entries: list[Entry], people: list[Person], week_days, theme: str,
+) -> None:
+    """Floating modal (sized by Streamlit, not full-screen)."""
+    _draw_days(entries, people, week_days, theme)

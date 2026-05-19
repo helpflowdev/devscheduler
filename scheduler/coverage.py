@@ -18,6 +18,15 @@ def _to_min(hhmm: str) -> int:
     return int(h) * 60 + int(m)
 
 
+def _length_label(start_min: int, end_min: int) -> str:
+    """Whole-shift duration as e.g. ``"8h"`` or ``"7h 30m"``."""
+    dur = end_min - start_min
+    if dur <= 0:
+        dur += 24 * 60
+    h, m = divmod(dur, 60)
+    return f"{h}h" + (f" {m}m" if m else "")
+
+
 @dataclass(slots=True)
 class Segment:
     person: str
@@ -25,6 +34,7 @@ class Segment:
     start_min: int          # minutes from midnight, 0..1440
     end_min: int            # > start_min
     label: str              # 12-hour range of the *whole* shift
+    length: str = ""        # whole-shift duration, e.g. "8h"
 
 
 def week_shift_segments(
@@ -43,12 +53,13 @@ def week_shift_segments(
         person = name_by_id.get(e.person_id, f"#{e.person_id}")
         s, t = _to_min(e.start_time), _to_min(e.end_time)
         label = range_12h(e.start_time, e.end_time)
+        length = _length_label(s, t)
         if e.crosses_midnight or t <= s:
-            segs.append(Segment(person, e.work_date, s, 1440, label))
+            segs.append(Segment(person, e.work_date, s, 1440, label, length))
             if t > 0:
-                segs.append(Segment(person, e.work_date, 0, t, label))
+                segs.append(Segment(person, e.work_date, 0, t, label, length))
         else:
-            segs.append(Segment(person, e.work_date, s, t, label))
+            segs.append(Segment(person, e.work_date, s, t, label, length))
     return segs
 
 

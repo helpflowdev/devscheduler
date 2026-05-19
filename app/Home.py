@@ -20,7 +20,10 @@ from _lib import (  # noqa: E402  (sibling module; sets up sys.path)
     show_flash,
     theme_control,
 )
-from components.coverage_chart import render_overlap  # noqa: E402
+from components.coverage_chart import (  # noqa: E402
+    overlap_dialog,
+    render_overlap,
+)
 from components.week_grid import render_week_grid  # noqa: E402
 from scheduler.entries import get_week_entries, get_week_people  # noqa: E402
 from scheduler.errors import DomainError, OverwriteRequiredError  # noqa: E402
@@ -107,10 +110,14 @@ else:
         st.caption("No entries this week yet.")
 
     st.divider()
-    st.subheader("Weekly overlap")
+    ov_head, ov_btn = st.columns([4, 1])
+    ov_head.subheader("Weekly overlap")
+    if ov_btn.button("⤢ Expand", help="Open in a larger popup"):
+        overlap_dialog(entries, people, days, app_theme)
     st.caption(
         "Each bar is a shift. Each day is boxed; bars lined up vertically "
-        "within a day's box are people working at the same time."
+        "within a day's box are people working at the same time. "
+        "Hover a bar for its length."
     )
     render_overlap(entries, people, days, theme=app_theme)
 
