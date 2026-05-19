@@ -196,7 +196,7 @@ else:
                     }
                     for r in rows
                 ],
-                use_container_width=True, hide_index=True,
+                width="stretch", hide_index=True,
             )
 
             def _do_offset(*, overwrite: bool) -> None:

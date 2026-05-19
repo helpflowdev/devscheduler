@@ -1,4 +1,4 @@
-streamlit>=1.40
+streamlit>=1.43          # width="stretch" API (replaces use_container_width)
 altair>=5.0              # weekly overlap timeline chart
 pandas>=2.0              # chart dataframe
 SQLAlchemy>=2.0          # dialect-agnostic DB layer (SQLite local / Postgres prod)
