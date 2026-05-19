@@ -31,7 +31,14 @@ from scheduler.errors import DomainError, OverwriteRequiredError
 from scheduler.models import EntryType
 from scheduler.people import add_person, list_people
 from scheduler.timefmt import to_12h
-from scheduler.weeks import DAY_NAMES, end_from_duration, iso, week_dates
+from scheduler.templates import apply_template
+from scheduler.weeks import (
+    DAY_NAMES,
+    end_from_duration,
+    iso,
+    monday_of,
+    week_dates,
+)
 
 st.set_page_config(page_title="Add Schedule", page_icon="📝")
 theme_control()
@@ -39,6 +46,24 @@ require_password()
 st.title("📝 Add Schedule")
 require_edit_unlock("add schedules")
 show_flash()
+
+with st.expander("↺ Apply the default weekly schedule"):
+    st.caption(
+        "Rebuilds an entire week (and any missing people) from the saved "
+        "default roster, overwriting that week. Use it to restore after a "
+        "reset, then tweak exceptions."
+    )
+    tpl_date = st.date_input("Apply to the week containing",
+                             value=date.today())
+    if st.button("↺ Apply default schedule", type="primary"):
+        try:
+            with get_db() as conn:
+                n = apply_template(conn, tpl_date)
+            set_flash(f"Applied the default schedule — {n} entries for "
+                      f"the week of {monday_of(tpl_date):%b %d}.")
+            st.rerun()
+        except DomainError as exc:
+            st.error(str(exc))
 
 ss = st.session_state
 ss.setdefault("ae_step", 1)

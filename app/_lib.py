@@ -47,7 +47,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b15 · overlap crash-proof (chart computes length)"
+BUILD = "2026-05-19 · b16 · default weekly schedule template"
 
 _FLASH_KEY = "_flash"
 
