@@ -18,8 +18,21 @@ _AXIS_LABEL = (
 )
 
 
+_THEMES = {
+    "Dark": {
+        "bg": "#0E1117", "fg": "#FAFAFA",
+        "grid": "#3A3F4B", "border": "#5A6072",
+    },
+    "Light": {
+        "bg": "#FFFFFF", "fg": "#31333F",
+        "grid": "#E6E6E6", "border": "#B8BCC8",
+    },
+}
+
+
 def render_overlap(
-    entries: list[Entry], people: list[Person], week_days
+    entries: list[Entry], people: list[Person], week_days,
+    *, theme: str = "Dark",
 ) -> None:
     name_by_id = {p.id: p.name for p in people}
     segs = week_shift_segments(entries, name_by_id)
@@ -44,9 +57,10 @@ def render_overlap(
         for s in segs
     )
 
+    c = _THEMES.get(theme, _THEMES["Dark"])
     chart = (
         alt.Chart(df)
-        .mark_bar(cornerRadius=3, opacity=0.85)
+        .mark_bar(cornerRadius=3, opacity=0.9)
         .encode(
             x=alt.X(
                 "start:Q",
@@ -61,9 +75,24 @@ def render_overlap(
             y=alt.Y("Person:N", title=None),
             color=alt.Color("Person:N", legend=None),
             tooltip=["Person", "Day", "Shift"],
-            row=alt.Row("Day:N", sort=day_order, title=None),
+            row=alt.Row(
+                "Day:N", sort=day_order, title=None,
+                header=alt.Header(labelAngle=0, labelAlign="left"),
+            ),
         )
         .properties(height=alt.Step(22))
+        .configure_view(
+            stroke=c["border"], strokeWidth=1.5,  # box per day = divider
+            fill=c["bg"],
+        )
+        .configure_facet(spacing=10)
+        .configure_axis(
+            labelColor=c["fg"], titleColor=c["fg"],
+            gridColor=c["grid"], domainColor=c["grid"],
+            tickColor=c["grid"],
+        )
+        .configure_header(labelColor=c["fg"], titleColor=c["fg"])
+        .configure(background=c["bg"])
     )
     st.altair_chart(chart, use_container_width=True)
 

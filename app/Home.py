@@ -84,12 +84,17 @@ else:
         st.caption("No entries this week yet.")
 
     st.divider()
-    st.subheader("Weekly overlap")
-    st.caption(
-        "Each bar is a shift. Bars lined up vertically on the same day "
-        "are people working at the same time."
+    head, appear = st.columns([3, 1])
+    head.subheader("Weekly overlap")
+    chart_theme = appear.radio(
+        "Appearance", ["Dark", "Light"], horizontal=True,
+        label_visibility="collapsed",
     )
-    render_overlap(entries, people, days)
+    st.caption(
+        "Each bar is a shift. Each day is boxed; bars lined up vertically "
+        "within a day's box are people working at the same time."
+    )
+    render_overlap(entries, people, days, theme=chart_theme)
 
     st.divider()
     nxt_mon = add_weeks(anchor, 1)
