@@ -69,6 +69,19 @@ edit_mode = ctrl_edit.toggle(
 
 st.divider()
 
+@st.fragment
+def _edit_grid(anchor_iso: str, manila: bool) -> None:
+    """Edit-mode grid in its own fragment: cell clicks/saves rerun only
+    this block — no whole-page flicker or scroll jump."""
+    wk = week_dates(anchor_iso)
+    with get_db() as conn:
+        ents = get_week_entries(conn, anchor_iso)
+        ppl = get_week_people(conn, anchor_iso, entries=ents)
+    render_week_grid(ppl, ents, wk, manila=manila, edit_mode=True)
+    if not ents:
+        st.caption("No entries this week yet.")
+
+
 with get_db() as conn:
     entries = get_week_entries(conn, anchor.isoformat())
     people = get_week_people(conn, anchor.isoformat(), entries=entries)
@@ -78,11 +91,14 @@ if not people:
         "No people yet. Add your team in **Manage People** (sidebar), "
         "then schedule them in **Add Schedule**."
     )
+elif edit_mode:
+    st.caption(
+        "✏️ Edit mode — click a cell to change that day. "
+        "Overlap & roll-forward are hidden while editing for speed."
+    )
+    _edit_grid(anchor.isoformat(), manila)
 else:
-    if edit_mode:
-        st.caption("✏️ Edit mode on — click a cell to change that day.")
-    render_week_grid(people, entries, days, manila=manila,
-                     edit_mode=edit_mode)
+    render_week_grid(people, entries, days, manila=manila, edit_mode=False)
     if not entries:
         st.caption("No entries this week yet.")
 

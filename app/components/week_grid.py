@@ -15,7 +15,6 @@ from _lib import (
     get_db,
     pick_duration_stacked,
     pick_time_12h_stacked,
-    set_flash,
 )
 from scheduler.entries import apply_entry, delete_entries, index_by_person_date
 from scheduler.errors import DomainError
@@ -98,8 +97,8 @@ def _cell_editor(person: Person, iso: str, current: Entry | None) -> None:
             with get_db() as conn:
                 apply_entry(conn, person.id, [iso], etype,
                             start_time=start, end_time=end, overwrite=True)
-            set_flash(f"Saved {person.name} · {iso}.")
-            st.rerun()
+            st.session_state["_grid_toast"] = f"Saved {person.name} · {iso}"
+            st.rerun(scope="fragment")  # refresh only the grid, no flicker
         except DomainError as exc:
             st.error(str(exc))
 
@@ -107,8 +106,8 @@ def _cell_editor(person: Person, iso: str, current: Entry | None) -> None:
         try:
             with get_db() as conn:
                 delete_entries(conn, person.id, [iso])
-            set_flash(f"Deleted {person.name} · {iso}.")
-            st.rerun()
+            st.session_state["_grid_toast"] = f"Deleted {person.name} · {iso}"
+            st.rerun(scope="fragment")
         except DomainError as exc:
             st.error(str(exc))
 
@@ -121,6 +120,9 @@ def render_week_grid(
     manila: bool,
     edit_mode: bool = False,
 ) -> None:
+    if st.session_state.get("_grid_toast"):
+        st.toast(st.session_state.pop("_grid_toast"))
+
     grid = index_by_person_date(entries)
     tz_label = "Manila" if manila else "Pacific"
 
