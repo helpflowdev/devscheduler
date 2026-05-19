@@ -2,7 +2,7 @@
 
 Step 1 — pick a person and the date(s)/week.
 Step 2 — pick the type (Shift / PTO / UTO / RD) and, for shifts, the times.
-(Per-entry editing/deleting lives on the Edit or Delete page.)
+(Per-entry editing/deleting is inline on Home — toggle Edit there.)
 
 Bulk-applies one entry to every selected date; existing entries on those
 dates are listed and require an explicit overwrite confirm (FR-3, FR-4).

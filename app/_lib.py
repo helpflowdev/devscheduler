@@ -45,9 +45,34 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b8 · grid order = shift start (robust)"
+BUILD = "2026-05-19 · b9 · brand theme + inline cell editing"
 
 _FLASH_KEY = "_flash"
+
+# HelpFlow brand palette (brand guideline p.4).
+BRAND = {
+    "blue": "#2EA3F2",
+    "gray": "#A6A6A6",
+    "peach": "#FFE4B0",
+    "lavender": "#E1E0FF",
+    "sky": "#C3EDFF",
+    "navy": "#111229",
+}
+# Entry-type → (background, text) chips.
+TYPE_STYLE = {
+    "PTO": (BRAND["peach"], BRAND["navy"]),
+    "UTO": (BRAND["lavender"], BRAND["navy"]),
+    "RD": (BRAND["sky"], BRAND["navy"]),
+}
+
+
+def badge(text: str, bg: str, fg: str) -> str:
+    """A small colored chip (HTML) for use with unsafe_allow_html."""
+    return (
+        f"<span style='background:{bg};color:{fg};padding:2px 8px;"
+        f"border-radius:10px;font-size:0.85em;white-space:nowrap'>"
+        f"{text}</span>"
+    )
 
 
 @contextmanager
@@ -142,6 +167,33 @@ def pick_duration(key: str, default_min: int = 480) -> int:
         "Minutes", minutes,
         index=(dm // 5) if dm % 5 == 0 else 0, key=f"{key}_dm",
     )
+    return int(hours) * 60 + int(mins)
+
+
+def pick_time_12h_stacked(key: str, default_hhmm: str) -> str:
+    """Like :func:`pick_time_12h` but no st.columns — safe inside a
+    popover that already lives in a grid column."""
+    dh, dm = (int(x) for x in default_hhmm.split(":"))
+    minutes = [f"{i:02d}" for i in range(0, 60, 5)]
+    hour = st.selectbox("Start hour", list(range(1, 13)),
+                        index=(dh % 12 or 12) - 1, key=f"{key}_h")
+    minute = st.selectbox("Start min", minutes,
+                          index=(dm // 5) if dm % 5 == 0 else 0,
+                          key=f"{key}_m")
+    ampm = st.selectbox("AM/PM", ["AM", "PM"],
+                        index=0 if dh < 12 else 1, key=f"{key}_ap")
+    return f"{hour % 12 + (12 if ampm == 'PM' else 0):02d}:{minute}"
+
+
+def pick_duration_stacked(key: str, default_min: int = 480) -> int:
+    """Like :func:`pick_duration` but no st.columns (popover-safe)."""
+    dh, dm = divmod(default_min, 60)
+    minutes = [f"{i:02d}" for i in range(0, 60, 5)]
+    hours = st.number_input("Length — hours", min_value=0, max_value=23,
+                            value=dh, key=f"{key}_dh")
+    mins = st.selectbox("Length — minutes", minutes,
+                        index=(dm // 5) if dm % 5 == 0 else 0,
+                        key=f"{key}_dm")
     return int(hours) * 60 + int(mins)
 
 

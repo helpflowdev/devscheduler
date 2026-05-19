@@ -57,14 +57,15 @@ nav_label.markdown(
     f"### Week of {days[0].strftime('%b %d')} – {days[-1].strftime('%b %d, %Y')}"
 )
 
-ctrl_jump, ctrl_tz = st.columns([2, 2])
+ctrl_jump, ctrl_tz, ctrl_edit = st.columns([2, 1, 1])
 jump = ctrl_jump.date_input("Jump to date", value=anchor)
 if monday_of(jump) != anchor:
     st.session_state.anchor = monday_of(jump).isoformat()
     st.rerun()
 manila = ctrl_tz.toggle(
-    "Show Manila time", help="Converts Pacific shift times per date (DST-aware)."
-)
+    "Manila time", help="Converts Pacific shift times per date (DST-aware).")
+edit_mode = ctrl_edit.toggle(
+    "✏️ Edit", help="Click any cell to add, change, or delete that day.")
 
 st.divider()
 
@@ -78,7 +79,10 @@ if not people:
         "then schedule them in **Add Schedule**."
     )
 else:
-    render_week_grid(people, entries, days, manila=manila)
+    if edit_mode:
+        st.caption("✏️ Edit mode on — click a cell to change that day.")
+    render_week_grid(people, entries, days, manila=manila,
+                     edit_mode=edit_mode)
     if not entries:
         st.caption("No entries this week yet.")
 

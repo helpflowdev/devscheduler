@@ -14,11 +14,10 @@ Scheduler/
 ├─ app/
 │  ├─ Home.py                 # Viewer: weekly team grid + week nav + roll-forward actions
 │  ├─ pages/
-│  │  ├─ 1_Add_Schedule.py    # person + date(s)/week → type + time
-│  │  ├─ 2_Manage_People.py   # Add / deactivate people
-│  │  └─ 3_Edit_or_Delete.py  # change or remove one person/date entry
+│  │  ├─ 1_Add_Schedule.py    # bulk add: person + date(s)/week → type + time
+│  │  └─ 2_Manage_People.py   # Add / deactivate people
 │  └─ components/
-│     ├─ week_grid.py         # Render the Mon–Sun grid
+│     ├─ week_grid.py         # Mon–Sun grid + inline cell edit (Edit mode)
 │     └─ coverage_chart.py    # Weekly overlap (per-day boxes)
 ├─ scheduler/                 # Pure logic, no Streamlit imports (unit-testable)
 │  ├─ db.py                   # Connection, migrations, schema

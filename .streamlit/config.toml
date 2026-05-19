@@ -1,0 +1,10 @@
+# HelpFlow brand theme (brand guideline p.4).
+# Primary blue #2EA3F2, dark navy #111229; accent peach/lavender/sky
+# used for entry-type badges in the app.
+[theme]
+base = "dark"
+primaryColor = "#2EA3F2"
+backgroundColor = "#111229"
+secondaryBackgroundColor = "#1E2147"
+textColor = "#FFFFFF"
+font = "sans serif"
