@@ -37,14 +37,12 @@ Derived from the DOD. Each milestone is shippable on its own.
 - [x] Verified in browser on the live shared DB (copy + conflict + cancel)
 - [ ] Tests: exact copy, overwrite-confirm path
 
-## M5 — Offset / slide (US-5, FR-6) ✅
-- [x] `scheduler/weeks.py`: `copy_week_with_offset` (shared `_copy_core`)
-- [x] Offset applies to SHIFT only; PTO/UTO unchanged; crosses_midnight recomputed
-- [x] `preview_offset` (read-only) + preview-before-apply UI + overwrite confirm
-- [x] Tests: ±offset, midnight-wrap recompute, zero-offset guard, PTO untouched,
-      preview writes nothing (64 pass)
-- [x] Verified in browser: preview renders correctly (apply left to unit tests
-      — live shared DB)
+## M5 — Offset / slide (US-5, FR-6) — REMOVED
+- Built and shipped, then **removed at user request** (2026-05-19): the
+  whole-team time-shift use case was too niche and added confusion.
+  `copy_week_with_offset` / `preview_offset` / `shift_shift_times` and the
+  Home offset UI + tests were deleted. Exact copy (FR-5) + per-entry edit
+  cover the real need. History preserved in git if ever revived.
 
 ## M6 — Polish ✅
 - [x] Overnight shift handling: ⏭ marker consistent in Pacific + Manila views

@@ -45,7 +45,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b6 · start-time order + renamed pages"
+BUILD = "2026-05-19 · b7 · start-time order, renamed pages, no offset"
 
 _FLASH_KEY = "_flash"
 
