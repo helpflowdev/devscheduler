@@ -15,7 +15,8 @@ Scheduler/
 │  ├─ Home.py                 # Viewer: weekly team grid + week nav + roll-forward actions
 │  ├─ pages/
 │  │  ├─ 1_Add_Schedule.py    # bulk add: person + date(s)/week → type + time
-│  │  └─ 2_Manage_People.py   # Add / deactivate people
+│  │  ├─ 2_Manage_People.py   # Add / deactivate people
+│  │  └─ 3_Planned_Leaves.py  # advance PTO/UTO registry (overlaid on week builds)
 │  └─ components/
 │     ├─ week_grid.py         # Mon–Sun grid + inline cell edit (Edit mode)
 │     └─ coverage_chart.py    # Weekly overlap (per-day boxes)
@@ -23,8 +24,10 @@ Scheduler/
 │  ├─ db.py                   # Connection, migrations, schema
 │  ├─ people.py               # Person CRUD
 │  ├─ entries.py              # Entry create/bulk-apply/overwrite
-│  ├─ weeks.py                # Week math, copy-forward, offset-forward
-│  └─ models.py               # Dataclasses: Person, Entry, EntryType enum
+│  ├─ weeks.py                # Week math, copy-forward (overlays planned leaves)
+│  ├─ templates.py            # Default roster; apply-to-week (overlays planned leaves)
+│  ├─ leaves.py               # Planned-leave registry + overlay onto a week
+│  └─ models.py               # Dataclasses: Person, Entry, PlannedLeave, EntryType
 ├─ tests/                     # pytest, against scheduler/ logic
 ├─ data/                      # scheduler.db (gitignored)
 ├─ docs/                      # PRD, data model, this file, backlog

@@ -75,9 +75,13 @@ def _do_copy(*, overwrite: bool) -> None:
     with get_db() as conn:
         res = copy_week(conn, anchor.isoformat(), nxt_mon.isoformat(),
                         overwrite=overwrite)
-    set_flash(saved_message(
+    msg = saved_message(
         f"Copied into the week of {nxt_mon:%b %d} —",
-        res.copied, res.overwritten))
+        res.copied, res.overwritten)
+    if res.leaves_applied:
+        msg += (f" {res.leaves_applied} planned-leave day(s) applied "
+                "on top.")
+    set_flash(msg)
     st.session_state.pop("copy_pending", None)
     st.session_state.anchor = nxt_mon.isoformat()
 

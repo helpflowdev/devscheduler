@@ -58,9 +58,13 @@ with st.expander("↺ Apply the default weekly schedule"):
     if st.button("↺ Apply default schedule", type="primary"):
         try:
             with get_db() as conn:
-                n = apply_template(conn, tpl_date)
-            set_flash(f"Applied the default schedule — {n} entries for "
-                      f"the week of {monday_of(tpl_date):%b %d}.")
+                res = apply_template(conn, tpl_date)
+            msg = (f"Applied the default schedule — {res.entries} entries "
+                   f"for the week of {monday_of(tpl_date):%b %d}.")
+            if res.leaves_applied:
+                msg += (f" {res.leaves_applied} planned-leave day(s) "
+                        "applied on top.")
+            set_flash(msg)
             st.rerun()
         except DomainError as exc:
             st.error(str(exc))

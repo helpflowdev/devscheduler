@@ -36,11 +36,32 @@ Constraints:
 - CHECK: when `entry_type = 'SHIFT'`, `start_time` and `end_time` are NOT NULL.
 - Index on `(person_id, work_date)` and on `work_date` for fast week queries / overwrite lookups.
 
+### `planned_leave`
+
+Advance-filed PTO/UTO. Kept **separate** from `schedule_entry` so a leave
+booked weeks ahead survives a week rebuild (copy-forward and template-apply
+both overwrite the destination week and would otherwise wipe it).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `person_id` | INTEGER NOT NULL | FK → `person.id`. |
+| `start_date` | TEXT NOT NULL | `YYYY-MM-DD`, inclusive. |
+| `end_date` | TEXT NOT NULL | `YYYY-MM-DD`, inclusive (single day → `= start_date`). |
+| `leave_type` | TEXT NOT NULL | `PTO` \| `UTO` only. |
+| `note` | TEXT NULL | Optional. |
+| `created_at` | TEXT NOT NULL | ISO-8601 UTC. |
+
+Constraints: CHECK `leave_type IN ('PTO','UTO')`; CHECK `end_date >= start_date`.
+Index on `(start_date, end_date)` and on `person_id`. No overlap/uniqueness
+constraint — the registry is a plain list; the overlay is idempotent.
+
 ## Derived concepts
 
 - **Week** = the 7 dates Mon..Sun. Resolved in code from any date via `date - weekday()`.
 - **Copy forward (FR-5):** for each entry in week W, insert/replace into week W+1 at `work_date + 7 days`, all fields identical.
 - **Offset forward (FR-6):** same as copy forward, but for `SHIFT` entries add the offset to `start_time`/`end_time`; recompute `crosses_midnight`. `PTO`/`UTO` unchanged.
+- **Leave overlay (FR-9):** when a week is built (copy-forward, template-apply, or the manual "apply to a week" action), every `planned_leave` intersecting that week is overlaid: for each `(person_id, date)` it covers, delete the existing `schedule_entry` for that pair then insert the PTO/UTO — the leave wins over the shift. Overlay runs **inside** copy-forward's single transaction. It never appends (one entry/date preserved) and is idempotent, so re-applying is safe. Materialized rows are independent of the registry: deleting a `planned_leave` afterward does not remove days already written.
 
 ## Why this shape
 

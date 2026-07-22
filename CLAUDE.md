@@ -15,6 +15,7 @@ Team Schedule Viewer — Python 3.13 · Streamlit · SQLite. One shared instance
 - v1: one `schedule_entry` per `(person_id, work_date)` enforced in app logic. Overwrite = delete existing rows for that pair then insert, warned + confirmed in the UI (PRD FR-4).
 - Copy-forward and offset-forward run in a **single transaction** — no partial rolls.
 - Offset applies to `SHIFT` entries only; `PTO`/`UTO` copy unchanged.
+- **Planned leaves** (advance PTO/UTO) live in their own `planned_leave` table, never `schedule_entry`. When a week is built (copy-forward, template-apply, or manual apply) overlapping leaves are **overlaid** — delete+insert PTO/UTO per `(person, date)`, leave wins over the shift. Copy-forward's overlay is inside its single transaction. Logic in `scheduler/leaves.py`; keep it idempotent and one-entry-per-date.
 - Times are stored as `HH:MM` Pacific (`America/Los_Angeles`) wall-clock — single source of truth. Manila (`Asia/Manila`) is a computed display view only, per-entry using `work_date` (stdlib `zoneinfo`). Never store Manila times.
 - No DB `UNIQUE(person_id, work_date)`. v1 enforces one entry/date in app logic (overwrite = delete+insert, warned). Schema stays open for multiple shifts/day later.
 

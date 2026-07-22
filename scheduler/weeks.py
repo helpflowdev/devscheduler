@@ -44,6 +44,7 @@ def iso(d: date) -> str:
 class CopyResult:
     copied: int  # entries written into the destination week
     overwritten: int  # destination entries removed first
+    leaves_applied: int = 0  # planned-leave days overlaid onto the copy
 
 
 def _to_min(hhmm: str) -> int:
@@ -87,7 +88,9 @@ def _copy_core(
     dst_any_date: str | date,
     overwrite: bool,
 ) -> CopyResult:
-    from scheduler.entries import find_conflicts, insert_entry  # avoid cycle
+    # Local imports break the weeks↔entries / weeks↔leaves module cycles.
+    from scheduler.entries import find_conflicts, insert_entry
+    from scheduler.leaves import overlay_leaves
 
     src_mon = monday_of(src_any_date)
     dst_mon = monday_of(dst_any_date)
@@ -111,6 +114,7 @@ def _copy_core(
 
     now = now_iso()
     overwritten = 0
+    leaves_applied = 0
     try:
         if overwrite:
             cur = conn.execute(
@@ -130,12 +134,18 @@ def _copy_core(
                 crosses_midnight=r["crosses_midnight"],
                 note=r["note"], now=now,
             )
+        # Advance-filed leaves win over the copied shift on their dates.
+        leaves_applied = overlay_leaves(conn, dst_dates, now=now)
         conn.commit()
     except Exception:
         conn.rollback()
         raise
 
-    return CopyResult(copied=len(src_rows), overwritten=overwritten)
+    return CopyResult(
+        copied=len(src_rows),
+        overwritten=overwritten,
+        leaves_applied=leaves_applied,
+    )
 
 
 def copy_week(

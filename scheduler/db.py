@@ -29,7 +29,7 @@ DEFAULT_DB_PATH = Path(
     )
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Per-dialect migration statements (each a list of single statements).
 _MIGRATIONS: list[dict[str, list[str]]] = [
@@ -196,6 +196,46 @@ _MIGRATIONS: list[dict[str, list[str]]] = [
                 ON schedule_entry(person_id, work_date)""",
             """CREATE INDEX IF NOT EXISTS ix_entry_date
                 ON schedule_entry(work_date)""",
+        ],
+    },
+    # --- v4: planned_leave — advance-filed PTO/UTO registry ---------------
+    # A forward-looking leave list, kept separate from schedule_entry so a
+    # leave filed weeks ahead survives copy-forward / template-apply (both
+    # overwrite the destination week). See scheduler/leaves.py.
+    {
+        "sqlite": [
+            """CREATE TABLE IF NOT EXISTS planned_leave (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                person_id  INTEGER NOT NULL REFERENCES person(id),
+                start_date TEXT    NOT NULL,
+                end_date   TEXT    NOT NULL,
+                leave_type TEXT    NOT NULL
+                           CHECK (leave_type IN ('PTO','UTO')),
+                note       TEXT,
+                created_at TEXT    NOT NULL,
+                CHECK (end_date >= start_date)
+            )""",
+            """CREATE INDEX IF NOT EXISTS ix_leave_dates
+                ON planned_leave(start_date, end_date)""",
+            """CREATE INDEX IF NOT EXISTS ix_leave_person
+                ON planned_leave(person_id)""",
+        ],
+        "postgresql": [
+            """CREATE TABLE IF NOT EXISTS planned_leave (
+                id         BIGSERIAL PRIMARY KEY,
+                person_id  BIGINT  NOT NULL REFERENCES person(id),
+                start_date TEXT    NOT NULL,
+                end_date   TEXT    NOT NULL,
+                leave_type TEXT    NOT NULL
+                           CHECK (leave_type IN ('PTO','UTO')),
+                note       TEXT,
+                created_at TEXT    NOT NULL,
+                CHECK (end_date >= start_date)
+            )""",
+            """CREATE INDEX IF NOT EXISTS ix_leave_dates
+                ON planned_leave(start_date, end_date)""",
+            """CREATE INDEX IF NOT EXISTS ix_leave_person
+                ON planned_leave(person_id)""",
         ],
     },
 ]

@@ -58,6 +58,20 @@ Derived from the DOD. Each milestone is shippable on its own.
 - [x] README run instructions verified; 64 tests pass; all pages render,
       0 functional console errors
 
+## M7 — Planned leaves (FR-9) ✅
+- [x] Migration **v4**: `planned_leave` table (advance PTO/UTO registry),
+      kept separate from `schedule_entry` so it survives week rebuilds
+- [x] `scheduler/leaves.py`: add/list/delete + `overlay_leaves` (no-commit,
+      joins copy's txn) + `apply_planned_leaves_to_week` (standalone)
+- [x] Overlay wired into `copy_week` (single txn) and `apply_template`
+      (returns `TemplateResult`); Home + Add-Schedule report leaves applied
+- [x] `pages/3_Planned_Leaves.py`: file a leave (date range), preview +
+      apply to a week, list/delete upcoming (toggle past)
+- [x] Tests (`test_leaves.py`, 13): CRUD/validation, overlap clipping,
+      overlay-wins-over-shift, one-entry-per-date, absent-from-source,
+      template overlay, idempotent re-apply — full suite passes
+- [x] Live DB migrated v3→v4 cleanly (additive: table + indexes)
+
 ## PRD §11 open questions — all resolved (see PRD §11)
 1. Week start: **Monday** · 2. Timezone: **Pacific base + Manila view**
 3. Inactive people **visible in weeks they have entries** · 4. Multi-shift/day:
