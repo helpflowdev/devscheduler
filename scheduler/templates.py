@@ -7,10 +7,12 @@ rebuilds the people and the whole week, then you tweak exceptions.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import timedelta
 
 from scheduler.db import Connection
 from scheduler.entries import apply_entry
+from scheduler.leaves import apply_planned_leaves_to_week
 from scheduler.models import EntryType
 from scheduler.people import add_person
 from scheduler.weeks import iso, monday_of
@@ -59,15 +61,23 @@ def ensure_person(conn: Connection, name: str) -> int:
     return add_person(conn, name).id
 
 
+@dataclass(slots=True)
+class TemplateResult:
+    entries: int  # template cells written
+    leaves_applied: int  # planned-leave days overlaid on top afterward
+
+
 def apply_template(
     conn: Connection,
     any_date_in_week,
     template=DEFAULT_TEMPLATE,
-) -> int:
+) -> TemplateResult:
     """Write ``template`` onto the week containing ``any_date_in_week``.
 
     Missing people are created. Existing entries on the affected
-    person/dates are overwritten. Returns the number of entries written.
+    person/dates are overwritten. Any advance-filed leave overlapping the
+    week is then overlaid on top (so a pre-booked PTO/UTO wins over the
+    templated shift). Returns the cells written and leave-days overlaid.
     """
     mon = monday_of(any_date_in_week)
     ids: dict[str, int] = {}
@@ -80,4 +90,5 @@ def apply_template(
             overwrite=True,
         )
         n += 1
-    return n
+    leaves = apply_planned_leaves_to_week(conn, mon)
+    return TemplateResult(entries=n, leaves_applied=leaves)

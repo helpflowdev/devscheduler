@@ -15,8 +15,9 @@ MON = "2026-05-18"  # a Monday
 
 
 def test_apply_creates_people_and_full_week(db):
-    n = apply_template(db, MON)
-    assert n == len(DEFAULT_TEMPLATE)
+    res = apply_template(db, MON)
+    assert res.entries == len(DEFAULT_TEMPLATE)
+    assert res.leaves_applied == 0  # none filed
     names = {p.name for p in list_people(db)}
     assert {"JC", "Gio", "Karim", "Shierraine", "Marion"} <= names
     # 5 people × 7 days, every cell filled by the template.

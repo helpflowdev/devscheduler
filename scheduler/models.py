@@ -78,3 +78,38 @@ class Entry:
             created_at=row["created_at"] if "created_at" in keys else None,
             updated_at=row["updated_at"] if "updated_at" in keys else None,
         )
+
+
+@dataclass(slots=True)
+class PlannedLeave:
+    """An advance-filed leave spanning ``start_date``..``end_date`` (both
+    inclusive). ``leave_type`` is PTO or UTO only — never SHIFT/RD.
+
+    Stored apart from :class:`Entry` so a leave booked weeks ahead is not
+    wiped when a week is rebuilt by copy-forward or the template; the
+    builders overlay it (see ``scheduler.leaves``). ``person_name`` is only
+    populated when the row was read with the person join.
+    """
+
+    person_id: int
+    start_date: str  # "YYYY-MM-DD", inclusive
+    end_date: str  # "YYYY-MM-DD", inclusive
+    leave_type: EntryType  # PTO | UTO
+    note: str | None = None
+    created_at: str | None = None
+    id: int | None = None
+    person_name: str | None = None
+
+    @classmethod
+    def from_row(cls, row) -> "PlannedLeave":
+        keys = row.keys()
+        return cls(
+            id=row["id"],
+            person_id=row["person_id"],
+            start_date=row["start_date"],
+            end_date=row["end_date"],
+            leave_type=EntryType(row["leave_type"]),
+            note=row["note"],
+            created_at=row["created_at"] if "created_at" in keys else None,
+            person_name=row["person_name"] if "person_name" in keys else None,
+        )
