@@ -10,7 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from scheduler.models import Entry, EntryType
-from scheduler.timefmt import range_12h
+from scheduler.timefmt import hours_label, range_12h
+from scheduler.weeks import duration_minutes
 
 
 def _to_min(hhmm: str) -> int:
@@ -23,8 +24,7 @@ def _length_label(start_min: int, end_min: int) -> str:
     dur = end_min - start_min
     if dur <= 0:
         dur += 24 * 60
-    h, m = divmod(dur, 60)
-    return f"{h}h" + (f" {m}m" if m else "")
+    return hours_label(dur)
 
 
 @dataclass(slots=True)
@@ -76,3 +76,20 @@ def peak_overlap(segments: list[Segment], work_date: str) -> int:
         cur += delta
         peak = max(peak, cur)
     return peak
+
+
+def week_minutes_by_person(entries: list[Entry]) -> dict[int, int]:
+    """Total scheduled SHIFT minutes per ``person_id`` across ``entries``.
+
+    A split day sums its blocks; PTO/UTO/RD carry no hours and contribute
+    nothing. The figure is timezone-independent — a shift is the same
+    length in Pacific and Manila — so the same total serves both views.
+    """
+    totals: dict[int, int] = {}
+    for e in entries:
+        if e.entry_type is not EntryType.SHIFT:
+            continue
+        totals[e.person_id] = totals.get(e.person_id, 0) + duration_minutes(
+            e.start_time, e.end_time, e.crosses_midnight
+        )
+    return totals

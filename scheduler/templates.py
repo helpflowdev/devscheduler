@@ -18,7 +18,9 @@ from scheduler.people import add_person
 from scheduler.weeks import iso, monday_of
 
 # Each row: (person, weekday 0=Mon..6=Sun, type, start, end).
-# Times are Pacific "HH:MM"; None for whole-day RD/PTO/UTO.
+# Times are Pacific "HH:MM"; None for whole-day RD/PTO/UTO. Two SHIFT rows
+# may share a (person, weekday) for a split day — the first replaces the
+# cell, the rest are added alongside it (FR-10).
 _S, _RD = "SHIFT", "RD"
 DEFAULT_TEMPLATE: list[tuple[str, int, str, str | None, str | None]] = []
 
@@ -75,19 +77,27 @@ def apply_template(
     """Write ``template`` onto the week containing ``any_date_in_week``.
 
     Missing people are created. Existing entries on the affected
-    person/dates are overwritten. Any advance-filed leave overlapping the
-    week is then overlaid on top (so a pre-booked PTO/UTO wins over the
-    templated shift). Returns the cells written and leave-days overlaid.
+    person/dates are overwritten — except where the template itself lists
+    a second row for the same day, which is added alongside the first
+    (split shift). Any advance-filed leave overlapping the week is then
+    overlaid on top (so a pre-booked PTO/UTO wins over the templated
+    shift). Returns the cells written and leave-days overlaid.
     """
     mon = monday_of(any_date_in_week)
     ids: dict[str, int] = {}
+    written: set[tuple[int, str]] = set()
     n = 0
     for name, wd, etype, start, end in template:
         pid = ids.get(name) or ids.setdefault(name, ensure_person(conn, name))
+        day = iso(mon + timedelta(days=wd))
+        # First row for a cell clears whatever was there; later rows for the
+        # same cell stack on top, so a template can define a split day.
+        first = (pid, day) not in written
+        written.add((pid, day))
         apply_entry(
-            conn, pid, [iso(mon + timedelta(days=wd))],
-            EntryType(etype), start_time=start, end_time=end,
-            overwrite=True,
+            conn, pid, [day], EntryType(etype),
+            start_time=start, end_time=end,
+            overwrite=first, mode="replace" if first else "add",
         )
         n += 1
     leaves = apply_planned_leaves_to_week(conn, mon)

@@ -31,7 +31,7 @@ Constraint: unique index on `name` where `is_active = 1`.
 | `updated_at` | TEXT NOT NULL | ISO-8601 UTC. |
 
 Constraints:
-- **No** DB-level `UNIQUE(person_id, work_date)` — schema must allow multiple entries per date for a future "multiple shifts/day" version (PRD §11.4). v1 enforces one-entry-per-date in app logic with overwrite warning (FR-2/FR-4); "overwrite" = delete existing rows for that `(person_id, work_date)` then insert.
+- **No** DB-level `UNIQUE(person_id, work_date)` — the schema allows multiple entries per date, which split shifts now use (PRD FR-10). App logic decides: `apply_entry(mode="replace")` keeps one entry per date ("overwrite" = delete existing rows for that `(person_id, work_date)` then insert, warned — FR-2/FR-4), while `mode="add"` stacks a non-overlapping SHIFT alongside. Composition is enforced by `check_day_composition` in `scheduler/entries.py`, never by a constraint.
 - CHECK: `entry_type IN ('SHIFT','PTO','UTO')`.
 - CHECK: when `entry_type = 'SHIFT'`, `start_time` and `end_time` are NOT NULL.
 - Index on `(person_id, work_date)` and on `work_date` for fast week queries / overwrite lookups.

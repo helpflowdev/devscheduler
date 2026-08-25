@@ -72,8 +72,32 @@ Derived from the DOD. Each milestone is shippable on its own.
       template overlay, idempotent re-apply — full suite passes
 - [x] Live DB migrated v3→v4 cleanly (additive: table + indexes)
 
+## M8 — Split shifts + weekly hours (FR-10, FR-11) ✅
+- [x] `apply_entry(mode="add")` stacks an entry on a day instead of replacing
+      it; `mode="replace"` keeps the v1 overwrite-warned behaviour
+- [x] `check_day_composition` (pure): shifts on one date may not overlap,
+      touching blocks allowed, PTO/UTO/RD stay whole-day-exclusive; all
+      target dates validated before any write (no partial bulk apply)
+- [x] `shift_span` puts an overnight shift past 1440 so 22:00–06:00 and
+      06:00–10:00 on one date don't falsely collide
+- [x] `update_entry` / `delete_entry` act on a single entry by id, so editing
+      half a split day leaves the other half alone (note preserved)
+- [x] Grid cell editor is a slot picker (one slot per entry + "➕ Add a
+      shift"); split days stack in the cell, compact `edit_cell_label` in
+      edit mode; Add Schedule page gained a replace/add choice
+- [x] Templates may list two SHIFT rows for one `(person, weekday)` — first
+      replaces the cell, the rest are added alongside
+- [x] No schema change; copy-forward and the leave overlay already handled
+      multi-entry days (both verified by test)
+- [x] **Hours** column between Person and Mon — `week_minutes_by_person` +
+      `hours_label`; recomputed every render (fragment re-reads the week), so
+      no compute button
+- [x] Tests (`test_split_shifts.py` 39, `test_week_hours.py` 20) — full suite
+      171 passes; verified live in the app (split day, overlap rejection,
+      3-block day, 40h→47h total)
+
 ## PRD §11 open questions — all resolved (see PRD §11)
 1. Week start: **Monday** · 2. Timezone: **Pacific base + Manila view**
-3. Inactive people **visible in weeks they have entries** · 4. Multi-shift/day:
-   schema-ready, app enforces one/day in v1
-4. Multiple shifts per day (future version?)
+3. Inactive people **visible in weeks they have entries**
+4. Multi-shift/day: **shipped** in M8 (FR-10) — schema needed no change; the
+   no-overlap rule is app logic

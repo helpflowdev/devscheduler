@@ -5,7 +5,9 @@ Step 2 — pick the type (Shift / PTO / UTO / RD) and, for shifts, the times.
 (Per-entry editing/deleting is inline on Home — toggle Edit there.)
 
 Bulk-applies one entry to every selected date; existing entries on those
-dates are listed and require an explicit overwrite confirm (FR-3, FR-4).
+dates are listed and require an explicit overwrite confirm (FR-3, FR-4) —
+unless "add a second shift" is chosen, which stacks a split shift onto the
+day instead of replacing it (FR-10).
 """
 
 from __future__ import annotations
@@ -155,6 +157,7 @@ else:
     entry_type = EntryType(etype)
 
     start_str = end_str = None
+    add_mode = False
     if entry_type is EntryType.SHIFT:
         st.caption("Start (Pacific)")
         start_str = pick_time_12h("Hour", "ae_start", "09:00")
@@ -169,6 +172,17 @@ else:
         except DomainError as exc:
             end_str = None
             st.warning(str(exc))
+        add_mode = st.radio(
+            "If those dates already have a shift",
+            ["Replace it", "Add a second shift (split day)"],
+            horizontal=True,
+        ).startswith("Add")
+        if add_mode:
+            st.caption(
+                "Keeps what's already there and stacks this shift on top. "
+                "The two shifts must not overlap, and the day can't already "
+                "be PTO/UTO/RD."
+            )
     note = st.text_input("Note (optional)")
 
     nav_back, nav_save = st.columns([1, 2])
@@ -183,8 +197,10 @@ else:
                 conn, ss.ae_person_id, ss.ae_dates, entry_type,
                 start_time=start_str, end_time=end_str,
                 note=note or None, overwrite=overwrite,
+                mode="add" if add_mode else "replace",
             )
-        set_flash(saved_message("Saved", res.created, res.overwritten))
+        set_flash(saved_message("Added" if add_mode else "Saved",
+                                res.created, res.overwritten))
         _reset()
 
     if nav_save.button("Save", type="primary"):
