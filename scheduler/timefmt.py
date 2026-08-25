@@ -28,3 +28,17 @@ def to_12h(hhmm: str) -> str:
 def range_12h(start_hhmm: str, end_hhmm: str) -> str:
     """A shift range in 12-hour form: ``"9:00 AM–5:00 PM"``."""
     return f"{to_12h(start_hhmm)}–{to_12h(end_hhmm)}"
+
+
+def hours_label(minutes: int) -> str:
+    """A duration in minutes as a compact label.
+
+    >>> hours_label(480)
+    '8h'
+    >>> hours_label(450)
+    '7h 30m'
+    >>> hours_label(0)
+    '0h'
+    """
+    h, m = divmod(max(minutes, 0), 60)
+    return f"{h}h" + (f" {m}m" if m else "")

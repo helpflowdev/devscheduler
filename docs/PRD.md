@@ -91,13 +91,16 @@ v1 has a single trust level — everyone using the instance can edit. No login.
 ## 6. Functional Requirements
 
 - FR-1 People: create, list, mark inactive (inactive hidden from grid, history kept).
-- FR-2 Entries: v1 enforces one entry per person per date in app logic (overwrite-warned). Schema permits multiple entries per date so a later version can add multiple shifts/day without migration.
+- FR-2 Entries: one entry per person per date by default (overwrite-warned). A day may also hold several **non-overlapping** SHIFT entries — see FR-10. No schema change was needed; the schema always permitted multiple entries per date.
 - FR-3 Bulk apply across multiple selected dates / a full week.
 - FR-4 Overwrite protection: warn + confirm before replacing existing entries.
 - FR-5 Copy week forward (exact).
 - FR-6 Copy week forward with Shift offset; preview required.
 - FR-7 Week navigation by relative (prev/next) and absolute (date jump).
 - FR-8 Times are stored as wall-clock in the **base timezone Pacific (`America/Los_Angeles`, "PST/PDT")**. The viewer offers a **Manila (`Asia/Manila`) conversion view** toggle that converts each entry using its own `work_date` (so Pacific DST is handled correctly per date).
+- FR-9 Planned leaves: advance PTO/UTO registry, overlaid whenever a week is built. See [FR-002](feature_requests/FR-002-planned-leaves.md).
+- FR-10 Split shifts: a person may have several non-overlapping SHIFTs on one date, each editable and deletable on its own. Whole-day PTO/UTO/RD stay exclusive. See [FR-003](feature_requests/FR-003-split-shifts.md).
+- FR-11 Weekly hours: the grid shows each person's total scheduled shift hours for the displayed week beside their name, recomputed on every render.
 
 ## 7. Data Model (summary)
 
@@ -118,6 +121,8 @@ See [DATA_MODEL.md](DATA_MODEL.md). Core tables: `person`, `schedule_entry`.
 - Offset pushes a shift past midnight → allowed, flagged in preview.
 - Copying onto a partially filled week → per-date overwrite warning.
 - Adding a person whose name already exists → reject duplicate active names.
+- Two shifts added to one date that overlap → rejected; touching blocks (09:00–13:00 + 13:00–17:00) are allowed. Only same-date overlap is checked — an overnight shift is not compared against the next date's entries.
+- A split day covered by a planned leave → the leave replaces **every** entry on that date.
 - Selecting "whole week" then also individual dates → week mode wins.
 
 ## 10. Success Metrics
