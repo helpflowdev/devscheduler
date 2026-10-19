@@ -50,8 +50,10 @@ glance rather than inferred from the cells.
 - **Per-entry edit and delete:** `update_entry(entry_id, …)` edits one entry
   in place (validated against that day's *other* entries, note preserved)
   and `delete_entry(entry_id)` removes just that one. The grid's cell editor
-  is now a slot picker — one slot per existing entry plus "➕ Add a shift"
-  when the day holds only shifts.
+  opens on an existing entry (a "Which shift?" picker on a split day) and
+  offers **Update** (labelled with that shift's times) beside **➕ Add as another shift** when the
+  day holds only shifts — so typing new times never silently replaces the
+  shift that was there.
 - **Templates** may list several rows for the same `(person, weekday)`: the
   first row for a cell replaces it, the rest are added alongside.
 - **Week builders are unaffected by design:** copy-forward wipes the whole

@@ -195,7 +195,8 @@ if not people:
 elif edit_mode:
     require_edit_unlock("edit schedules")
     st.caption(
-        "✏️ Edit mode — click a cell to change that day. "
+        "✏️ Edit mode — click a cell to change that day or add a "
+        "second (split) shift. "
         "Overlap & roll-forward are hidden while editing for speed."
     )
     _edit_grid(anchor.isoformat(), manila)

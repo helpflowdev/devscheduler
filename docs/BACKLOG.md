@@ -82,9 +82,10 @@ Derived from the DOD. Each milestone is shippable on its own.
       06:00–10:00 on one date don't falsely collide
 - [x] `update_entry` / `delete_entry` act on a single entry by id, so editing
       half a split day leaves the other half alone (note preserved)
-- [x] Grid cell editor is a slot picker (one slot per entry + "➕ Add a
-      shift"); split days stack in the cell, compact `edit_cell_label` in
-      edit mode; Add Schedule page gained a replace/add choice
+- [x] Grid cell editor: pick the shift ("Which shift?" on a split day),
+      then **Update** it or **➕ Add as another shift**; split
+      days stack in the cell, compact `edit_cell_label` in edit mode; Add
+      Schedule page gained a replace/add choice
 - [x] Templates may list two SHIFT rows for one `(person, weekday)` — first
       replaces the cell, the rest are added alongside
 - [x] No schema change; copy-forward and the leave overlay already handled

@@ -50,7 +50,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-08-24 · b23 · Clear message when the DB is unreachable"
+BUILD = "2026-10-19 · b24 · Grid editor: update or add a split shift"
 
 _FLASH_KEY = "_flash"
 
