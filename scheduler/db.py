@@ -267,7 +267,15 @@ def _get_engine(url: str) -> Engine:
             # NullPool: a fresh DBAPI connection per use and closed on
             # release — matches the connect-per-interaction design and
             # frees SQLite file handles promptly (Windows/tests).
-            eng = create_engine(url, poolclass=NullPool, future=True)
+            kwargs = {}
+            if url.startswith("postgresql"):
+                # Fail fast on an unreachable host (paused Supabase project,
+                # IPv6-only direct connection) instead of hanging the page
+                # until the OS TCP timeout.
+                kwargs["connect_args"] = {"connect_timeout": 10}
+            eng = create_engine(
+                url, poolclass=NullPool, future=True, **kwargs
+            )
             if eng.dialect.name == "sqlite":
                 @event.listens_for(eng, "connect")
                 def _fk_on(dbapi_conn, _rec):  # enforce FKs on SQLite

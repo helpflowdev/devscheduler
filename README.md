@@ -46,9 +46,17 @@ pytest
 Free, persistent, no servers to manage. ~10 minutes.
 
 **1. Create a free Postgres database.** Either works:
-- **Supabase** → New project → Settings → Database → copy the
-  **connection string** (URI). Use the *direct* connection.
+- **Supabase** → New project → **Connect** → **Session pooler** → copy that
+  URI (host `...pooler.supabase.com`, port `5432`, user
+  `postgres.<project-ref>`). Do **not** use the *direct* connection
+  (`db.<ref>.supabase.co`): it is IPv6-only and Streamlit Community Cloud
+  is IPv4-only, so the app fails at startup with a `psycopg`
+  `OperationalError`. Session mode (5432), not Transaction mode (6543) —
+  the migration runs multi-statement transactions.
 - **Neon** → New project → copy the `postgresql://...` connection string.
+
+> Supabase free projects **pause after ~7 days of inactivity**. If the app
+> suddenly can't connect, check the dashboard and hit **Restore** first.
 
 **2. Deploy the app.** Go to **share.streamlit.io** → sign in with GitHub →
 **Create app** → pick `helpflowdev/devscheduler`, branch `main`, main file

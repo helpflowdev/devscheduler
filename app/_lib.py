@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import re
 import sys
 import time
 from contextlib import contextmanager
@@ -42,12 +43,14 @@ def _bridge_secrets() -> None:
 
 _bridge_secrets()
 
+from sqlalchemy.exc import OperationalError  # noqa: E402
+
 from scheduler.db import connect  # noqa: E402
 from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b22 · Manila view splits across days"
+BUILD = "2026-08-24 · b23 · Clear message when the DB is unreachable"
 
 _FLASH_KEY = "_flash"
 
@@ -77,9 +80,41 @@ def badge(text: str, bg: str, fg: str) -> str:
     )
 
 
+_DB_HELP = """
+The app started, but the database in `DATABASE_URL` refused the
+connection. Usual causes, in order:
+
+1. **Supabase project is paused** — free projects pause after ~7 days
+   idle. Open the Supabase dashboard and hit **Restore**.
+2. **Direct connection used** — `db.<ref>.supabase.co` is IPv6-only and
+   Streamlit Cloud is IPv4-only. Use the **Session pooler** URI instead
+   (`...pooler.supabase.com:5432`, user `postgres.<project-ref>`).
+3. **Bad password** — re-copy it and percent-encode any `@ : / ?`.
+"""
+
+
+def _scrub(msg: str) -> str:
+    """Strip any user:password@ pair out of a driver error message."""
+    return re.sub(r"://[^/\s]*:[^/\s]*@", "://***:***@", msg)
+
+
+def _db_unreachable(exc: Exception) -> None:
+    """Explain a failed connect instead of Streamlit's redacted traceback."""
+    st.error("Can't reach the database.")
+    st.markdown(_DB_HELP)
+    lines = str(exc).strip().splitlines()
+    if lines:
+        with st.expander("Driver message"):
+            st.code(_scrub(lines[0]))
+    st.stop()
+
+
 @contextmanager
 def get_db():
-    conn = connect()
+    try:
+        conn = connect()
+    except OperationalError as exc:
+        _db_unreachable(exc)
     try:
         yield conn
     finally:
