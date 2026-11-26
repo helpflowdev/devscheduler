@@ -1,9 +1,10 @@
 """Weekly team grid — bordered rows, colored type badges, inline editing.
 
 `format_cell` and `edit_cell_label` stay pure (plain text, used by tests).
-`cell_html` adds brand-colored chips for PTO/UTO/RD. In edit mode each cell
-is a popover with a small editor (replaces the old Edit/Delete page) that
-can update a shift or add another beside it — a split shift (FR-10).
+`cell_html` adds brand-colored chips for PTO/UTO/RD and for OT, which keeps
+its times inside the chip (FR-12). In edit mode each cell is a popover with
+a small editor (replaces the old Edit/Delete page) that can update a shift
+or add another beside it — a split shift (FR-10) or OT.
 """
 
 from __future__ import annotations
@@ -11,11 +12,14 @@ from __future__ import annotations
 import streamlit as st
 
 from _lib import (
+    TYPE_CHOICES,
     TYPE_STYLE,
     badge,
     get_db,
+    parse_type_choice,
     pick_duration_stacked,
     pick_time_12h_stacked,
+    type_choice_of,
 )
 from scheduler.coverage import week_minutes_by_person
 from scheduler.entries import (
@@ -31,13 +35,32 @@ from scheduler.tz import pacific_to_manila
 from scheduler.weeks import DAY_NAMES, duration_minutes, end_from_duration
 
 _EMOJI = {EntryType.PTO: "🌴", EntryType.UTO: "⚪", EntryType.RD: "💤"}
+_OT_TAG = "⏱ OT"
 
 # Person · weekly hours · Mon…Sun.
 _COL_WIDTHS = [1.2, 0.7] + [1] * 7
 _HOURS_HELP = (
-    "Total scheduled shift hours for this person this week. Split days sum "
-    "both blocks; PTO/UTO/RD count as none. Recomputed on every save."
+    "Total scheduled shift hours for this person this week, with OT shown "
+    "separately. Split days sum both blocks; PTO/UTO/RD count as none. "
+    "Recomputed on every save."
 )
+
+
+def _ot_badge(text: str) -> str:
+    """OT chip carrying its times. Unlike the one-word PTO/UTO/RD chips it
+    must wrap — a time range doesn't fit a day column on one line."""
+    bg, fg = TYPE_STYLE["OT"]
+    return (
+        f"<span style='display:inline-block;background:{bg};color:{fg};"
+        f"padding:2px 8px;border-radius:8px;font-size:0.85em;"
+        f"line-height:1.35;white-space:normal'>{_OT_TAG} {text}</span>"
+    )
+
+
+def hours_cell(regular_min: int, ot_min: int) -> str:
+    """Hours column text: ``"40h"`` or ``"40h + 2h OT"``."""
+    text = hours_label(regular_min)
+    return f"{text} + {hours_label(ot_min)} OT" if ot_min else text
 
 
 def _manila_12h(work_date: str, hhmm: str) -> str:
@@ -60,7 +83,8 @@ def format_cell(entries: list[Entry], manila: bool) -> str:
     parts: list[str] = []
     for e in entries:
         if e.entry_type is EntryType.SHIFT:
-            parts.append(_shift_text(e, manila))
+            text = _shift_text(e, manila)
+            parts.append(f"{_OT_TAG} {text}" if e.is_ot else text)
         else:
             parts.append(f"{_EMOJI[e.entry_type]} {e.entry_type.value}")
     return "  ·  ".join(parts)
@@ -76,13 +100,15 @@ def manila_cell_map(entries: list[Entry]) -> dict:
 
     A 7 AM–3 PM Pacific shift becomes 10 PM–12 AM on its day and
     12 AM–6 AM on the next day, each placed in the right Manila column.
-    Whole-day RD/PTO/UTO stay on their (Pacific) work date.
+    Whole-day RD/PTO/UTO stay on their (Pacific) work date. An OT block
+    keeps its OT chip on both halves.
     Returns {(person_id, "YYYY-MM-DD"): [html, …]}.
     """
     cells: dict = {}
 
-    def add(pid, iso, html):
-        cells.setdefault((pid, iso), []).append(html)
+    def add(pid, iso, text, ot=False):
+        cells.setdefault((pid, iso), []).append(
+            _ot_badge(text) if ot else text)
 
     for e in entries:
         if e.entry_type is not EntryType.SHIFT:
@@ -93,10 +119,10 @@ def manila_cell_map(entries: list[Entry]) -> dict:
         s_iso, e_iso = ms.work_date.isoformat(), me.work_date.isoformat()
         if s_iso == e_iso:
             add(e.person_id, s_iso,
-                f"{to_12h(ms.time)}–{to_12h(me.time)}")
+                f"{to_12h(ms.time)}–{to_12h(me.time)}", e.is_ot)
         else:  # crosses Manila midnight → split across the two days
-            add(e.person_id, s_iso, f"{to_12h(ms.time)}–12:00 AM")
-            add(e.person_id, e_iso, f"12:00 AM–{to_12h(me.time)}")
+            add(e.person_id, s_iso, f"{to_12h(ms.time)}–12:00 AM", e.is_ot)
+            add(e.person_id, e_iso, f"12:00 AM–{to_12h(me.time)}", e.is_ot)
     return cells
 
 
@@ -104,7 +130,8 @@ def _cell_html(entries: list[Entry], manila: bool) -> str:
     parts: list[str] = []
     for e in entries:
         if e.entry_type is EntryType.SHIFT:
-            parts.append(_shift_text(e, manila))
+            text = _shift_text(e, manila)
+            parts.append(_ot_badge(text) if e.is_ot else text)
         else:
             bg, fg = TYPE_STYLE[e.entry_type.value]
             parts.append(badge(f"{_EMOJI[e.entry_type]} "
@@ -126,8 +153,9 @@ def edit_cell_label(entries: list[Entry], manila: bool) -> str:
     parts = []
     for e in entries:
         if e.entry_type is EntryType.SHIFT:
-            parts.append(_manila_12h(e.work_date, e.start_time) if manila
-                         else to_12h(e.start_time))
+            start = (_manila_12h(e.work_date, e.start_time) if manila
+                     else to_12h(e.start_time))
+            parts.append(f"OT {start}" if e.is_ot else start)
         else:
             parts.append(e.entry_type.value)
     return " + ".join(parts)
@@ -135,7 +163,8 @@ def edit_cell_label(entries: list[Entry], manila: bool) -> str:
 
 def _slot_label(e: Entry) -> str:
     if e.entry_type is EntryType.SHIFT:
-        return range_12h(e.start_time, e.end_time)
+        rng = range_12h(e.start_time, e.end_time)
+        return f"{_OT_TAG} {rng}" if e.is_ot else rng
     return f"{_EMOJI[e.entry_type]} {e.entry_type.value}"
 
 
@@ -191,10 +220,9 @@ def _entry_form(
     # Keyed by entry id, not position — adding an earlier shift reorders
     # the day, and the form must stay with the entry it was opened on.
     k = f"{person.id}_{iso}_{current.id if current else 'new'}"
-    types = [t.value for t in EntryType]
-    cur_type = current.entry_type.value if current else "SHIFT"
-    etype = EntryType(st.radio(
-        "Type", types, index=types.index(cur_type),
+    cur_choice = type_choice_of(current) if current else "SHIFT"
+    etype, is_ot = parse_type_choice(st.radio(
+        "Type", TYPE_CHOICES, index=TYPE_CHOICES.index(cur_choice),
         horizontal=True, key=f"ty_{k}",
     ))
 
@@ -217,18 +245,22 @@ def _entry_form(
             st.warning(str(exc))
 
     def add(conn):
-        apply_entry(conn, person.id, [iso], etype,
-                    start_time=start, end_time=end, mode="add")
+        apply_entry(conn, person.id, [iso], etype, start_time=start,
+                    end_time=end, mode="add", is_ot=is_ot)
 
     if current is None:
         if st.button("Add", type="primary", key=f"ad_{k}"):
             _commit(person, iso, "Added", add)
         return
 
-    # A split shift can join a day of shifts, never a whole-day entry.
+    # A split shift or OT can join a day of shifts, never a whole-day
+    # entry. (OT on a rest day goes through Update — it replaces the RD.)
     can_add = etype is EntryType.SHIFT and all(
         e.entry_type is EntryType.SHIFT for e in entries)
-    if can_add:
+    if can_add and is_ot:
+        st.caption("Set the OT times, then **➕ Add as OT** beside this "
+                   "shift — or **Update** to turn this shift itself into OT.")
+    elif can_add:
         st.caption("Change the times, then **Update** this shift or "
                    "**➕ Add** them as another shift on this day.")
 
@@ -237,9 +269,11 @@ def _entry_form(
         # In place — the day's other shift must survive the edit.
         _commit(person, iso, "Updated", lambda conn: update_entry(
             conn, current.id, etype, start_time=start, end_time=end,
-            note=current.note))
-    if can_add and st.button("➕ Add as another shift", key=f"ad_{k}"):
-        _commit(person, iso, "Added a shift for", add)
+            note=current.note, is_ot=is_ot))
+    add_label = "➕ Add as OT" if is_ot else "➕ Add as another shift"
+    if can_add and st.button(add_label, key=f"ad_{k}"):
+        _commit(person, iso, "Added OT for" if is_ot else "Added a shift for",
+                add)
     if st.button("Delete", key=f"dl_{k}"):
         _commit(person, iso, "Deleted",
                 lambda conn: delete_entry(conn, current.id))
@@ -258,6 +292,7 @@ def render_week_grid(
 
     grid = index_by_person_date(entries)
     hours = week_minutes_by_person(entries)
+    ot_hours = week_minutes_by_person(entries, ot=True)
     # In Manila view, shifts are placed on their Manila day (split at
     # midnight); whole-day entries stay put.
     mcells = manila_cell_map(entries) if (manila and not edit_mode) else None
@@ -277,7 +312,12 @@ def render_week_grid(
             name = (person.name if person.is_active
                     else f"{person.name} (inactive)")
             cols[0].markdown(f"**{name}**")
-            cols[1].markdown(hours_label(hours.get(person.id, 0)))
+            # OT on its own line — "40h + 2h OT" won't fit the column.
+            # (HTML break: a markdown line starting "+" becomes a bullet.)
+            cols[1].markdown(hours_cell(hours.get(person.id, 0),
+                                        ot_hours.get(person.id, 0))
+                             .replace(" + ", "<br>+ "),
+                             unsafe_allow_html=True)
             for i, d in enumerate(week_days):
                 iso = d.isoformat()
                 cell = grid.get((person.id, iso), [])

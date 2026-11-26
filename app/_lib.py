@@ -50,7 +50,7 @@ from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-10-19 · b24 · Grid editor: update or add a split shift"
+BUILD = "2026-11-26 · b25 · OT entries; copy skips OT/PTO/UTO"
 
 _FLASH_KEY = "_flash"
 
@@ -63,12 +63,30 @@ BRAND = {
     "sky": "#C3EDFF",
     "navy": "#111229",
 }
-# Entry-type → (background, text) chips.
+# Entry-type → (background, text) chips. OT takes the one saturated brand
+# color so it stands apart from the pastel days-off chips.
 TYPE_STYLE = {
     "PTO": (BRAND["peach"], BRAND["navy"]),
     "UTO": (BRAND["lavender"], BRAND["navy"]),
     "RD": (BRAND["sky"], BRAND["navy"]),
+    "OT": (BRAND["blue"], "#FFFFFF"),
 }
+
+# What the type pickers offer. "OT" isn't an EntryType — it's a SHIFT with
+# is_ot set (FR-12) — so pickers go through these two helpers.
+TYPE_CHOICES = ["SHIFT", "OT", "PTO", "UTO", "RD"]
+
+
+def parse_type_choice(choice: str) -> tuple[EntryType, bool]:
+    """Picker value → ``(entry_type, is_ot)``."""
+    if choice == "OT":
+        return EntryType.SHIFT, True
+    return EntryType(choice), False
+
+
+def type_choice_of(e: Entry) -> str:
+    """An entry's picker value — the inverse of :func:`parse_type_choice`."""
+    return "OT" if e.is_ot else e.entry_type.value
 
 
 def badge(text: str, bg: str, fg: str) -> str:
@@ -261,7 +279,8 @@ def entries_phrase(n: int) -> str:
 def entry_detail(e: Entry) -> str:
     """How an existing entry reads in a conflict list (12-hour)."""
     if e.entry_type is EntryType.SHIFT:
-        return range_12h(e.start_time, e.end_time)
+        rng = range_12h(e.start_time, e.end_time)
+        return f"OT {rng}" if e.is_ot else rng
     return e.entry_type.value
 
 

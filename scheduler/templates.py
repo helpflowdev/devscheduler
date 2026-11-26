@@ -1,8 +1,12 @@
-"""Reusable weekly templates.
+"""Reusable weekly templates — each person's **standing schedule**.
 
 The default roster lives in code (not the DB) so a Streamlit-Cloud reboot
 that wipes the ephemeral SQLite can't lose it — applying the template
 rebuilds the people and the whole week, then you tweak exceptions.
+
+It is also the fallback for copy-forward (FR-13): a day that was PTO/UTO
+or OT-only last week is refilled from the person's standing day here via
+:func:`standing_day`. Keep it current when someone's regular hours change.
 """
 
 from __future__ import annotations
@@ -49,6 +53,24 @@ _week("Shierraine", {**{d: (_S, "14:00", "22:00") for d in range(4)},
 _week("Marion", {0: (_RD, None, None), 1: (_RD, None, None),
                  **{d: (_S, "15:30", "00:00") for d in (2, 3, 4, 5)},
                  6: (_RD, None, None)})
+
+
+def standing_day(
+    name: str,
+    weekday: int,
+    template=DEFAULT_TEMPLATE,
+) -> list[tuple[EntryType, str | None, str | None]]:
+    """``name``'s standing rows for ``weekday`` (0=Mon) as
+    ``(type, start, end)``, in template order — empty if the person or the
+    day isn't in the template. Name match is case-insensitive, like
+    :func:`ensure_person`. Pure — no DB access.
+    """
+    key = name.strip().lower()
+    return [
+        (EntryType(etype), start, end)
+        for n, wd, etype, start, end in template
+        if wd == weekday and n.lower() == key
+    ]
 
 
 def ensure_person(conn: Connection, name: str) -> int:

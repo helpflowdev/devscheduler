@@ -29,7 +29,7 @@ DEFAULT_DB_PATH = Path(
     )
 )
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Per-dialect migration statements (each a list of single statements).
 _MIGRATIONS: list[dict[str, list[str]]] = [
@@ -236,6 +236,23 @@ _MIGRATIONS: list[dict[str, list[str]]] = [
                 ON planned_leave(start_date, end_date)""",
             """CREATE INDEX IF NOT EXISTS ix_leave_person
                 ON planned_leave(person_id)""",
+        ],
+    },
+    # --- v5: is_ot — overtime flag on a SHIFT (FR-12) ----------------------
+    # OT is a shift with a different label, so it's a flag rather than a new
+    # entry_type: no table rebuild, and every shift rule (times, overlap,
+    # overnight, coverage) applies to it unchanged.
+    {
+        "sqlite": [
+            """ALTER TABLE schedule_entry ADD COLUMN is_ot INTEGER NOT NULL
+                DEFAULT 0 CHECK (is_ot IN (0, 1)
+                                 AND (is_ot = 0 OR entry_type = 'SHIFT'))""",
+        ],
+        "postgresql": [
+            """ALTER TABLE schedule_entry ADD COLUMN is_ot SMALLINT NOT NULL
+                DEFAULT 0 CHECK (is_ot IN (0, 1))""",
+            """ALTER TABLE schedule_entry ADD CONSTRAINT ck_entry_ot_shift
+                CHECK (is_ot = 0 OR entry_type = 'SHIFT')""",
         ],
     },
 ]

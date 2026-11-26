@@ -78,9 +78,18 @@ def _do_copy(*, overwrite: bool) -> None:
     msg = saved_message(
         f"Copied into the week of {nxt_mon:%b %d} —",
         res.copied, res.overwritten)
+    if res.skipped:
+        msg += (f" Left out {res.skipped} OT/PTO/UTO "
+                f"entr{'y' if res.skipped == 1 else 'ies'}")
+        msg += (f"; {res.filled} day(s) set from the standing schedule."
+                if res.filled else ".")
     if res.leaves_applied:
         msg += (f" {res.leaves_applied} planned-leave day(s) applied "
                 "on top.")
+    if res.unfilled:
+        days = ", ".join(f"{name} {date.fromisoformat(d):%a %m/%d}"
+                         for name, d in res.unfilled)
+        msg += f" ⚠️ No standing schedule, left empty: {days}."
     set_flash(msg)
     st.session_state.pop("copy_pending", None)
     st.session_state.anchor = nxt_mon.isoformat()
@@ -128,7 +137,10 @@ c_copy.markdown(_VSPACE, unsafe_allow_html=True)
 # Remember the request in session state — the password prompt must
 # survive reruns (typing / reveal-eye), not live inside the click.
 if c_copy.button(f"⧉ Copy → wk {nxt_mon:%b %d}", disabled=not entries,
-                 help="Copy this week's schedule into next week"):
+                 help="Copy this week's shifts and rest days into next "
+                      "week. OT, PTO and UTO aren't carried — those days "
+                      "get the person's standing schedule, then planned "
+                      "leaves are applied."):
     st.session_state["want_copy"] = True
 c_clear.markdown(_VSPACE, unsafe_allow_html=True)
 if c_clear.button("🗑 Clear week", disabled=not entries,
@@ -213,7 +225,7 @@ else:
     st.caption(
         "Each bar is a shift. Each day is boxed; bars lined up vertically "
         "within a day's box are people working at the same time. "
-        "Hover a bar for its length."
+        "Faded bars with a dashed edge are OT. Hover a bar for its length."
     )
     render_overlap(entries, people, days, theme=app_theme)
 

@@ -97,6 +97,24 @@ Derived from the DOD. Each milestone is shippable on its own.
       171 passes; verified live in the app (split day, overlap rejection,
       3-block day, 40h→47h total)
 
+## M9 — Overtime + copy-forward skips one-offs (FR-12, FR-13) ✅
+- [x] Schema v5: `schedule_entry.is_ot` (SHIFT-only CHECK) — OT is a flagged
+      shift, so overlap/overnight/coverage rules apply unchanged
+- [x] `apply_entry`/`update_entry` take `is_ot`; adding OT to an RD day
+      replaces the RD, PTO/UTO reject it (validated before any write)
+- [x] Grid: brand-blue `⏱ OT` chip with times (wraps in the column, both
+      Manila halves), `OT` in the edit label, "Which shift?" and type picker;
+      **➕ Add as OT** in the cell editor; Add Schedule offers OT (defaults to
+      add-beside, 5 PM · 2h)
+- [x] Hours column splits regular vs OT (`40h` / `+ 4h OT`); coverage chart
+      draws OT faded with a dashed edge; roster order ignores OT
+- [x] Copy-forward carries regular shifts + RD only; OT/PTO/UTO skipped;
+      emptied days refilled from `templates.standing_day`, else reported in
+      `CopyResult.unfilled`; planned leaves overlaid after — one transaction
+- [x] Tests (`test_overtime.py` 26, copy-forward fill 8) — full suite 205
+      passes; verified live (OT chips, hours split, chart, copy result
+      "32 copied · 5 left out · 3 set from standing schedule")
+
 ## PRD §11 open questions — all resolved (see PRD §11)
 1. Week start: **Monday** · 2. Timezone: **Pacific base + Manila view**
 3. Inactive people **visible in weeks they have entries**

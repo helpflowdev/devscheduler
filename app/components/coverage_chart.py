@@ -42,10 +42,16 @@ _THEMES = {
 
 def _day_chart(rows: list[dict], theme: dict):
     df = pd.DataFrame(rows)
+    is_ot = "datum.Type == 'OT'"
     return (
         alt.Chart(df)
-        .mark_bar(cornerRadius=3, opacity=0.9, height=16)
+        .mark_bar(cornerRadius=3, height=16)
         .encode(
+            # OT reads as "extra": same person color, faded, dashed edge.
+            opacity=alt.condition(is_ot, alt.value(0.45), alt.value(0.9)),
+            stroke=alt.condition(is_ot, alt.value(theme["fg"]),
+                                 alt.value("transparent")),
+            strokeDash=alt.value([3, 2]),
             x=alt.X(
                 "start:Q",
                 title=None,
@@ -93,7 +99,8 @@ def _draw_days(
         day_label = f"{DAY_NAMES[i]} {d.strftime('%m/%d')}"
         rows = [
             {"Person": s.person, "start": s.start_min, "end": s.end_min,
-             "Shift": s.label, "Length": _len(s.start_min, s.end_min)}
+             "Shift": s.label, "Length": _len(s.start_min, s.end_min),
+             "Type": "OT" if getattr(s, "is_ot", False) else "Shift"}
             for s in segs if s.work_date == iso
         ]
         with st.container(border=True):  # the per-day divider/box

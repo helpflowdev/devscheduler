@@ -22,18 +22,20 @@ Constraint: unique index on `name` where `is_active = 1`.
 | `id` | INTEGER PK AUTOINCREMENT | |
 | `person_id` | INTEGER NOT NULL | FK → `person.id`. |
 | `work_date` | TEXT NOT NULL | `YYYY-MM-DD`. |
-| `entry_type` | TEXT NOT NULL | `SHIFT` \| `PTO` \| `UTO`. |
+| `entry_type` | TEXT NOT NULL | `SHIFT` \| `PTO` \| `UTO` \| `RD`. |
 | `start_time` | TEXT NULL | `HH:MM` Pacific wall-clock, required iff `entry_type = SHIFT`. |
 | `end_time` | TEXT NULL | `HH:MM` Pacific wall-clock, required iff `entry_type = SHIFT`. |
 | `crosses_midnight` | INTEGER NOT NULL DEFAULT 0 | 1 if `end_time <= start_time`. |
 | `note` | TEXT NULL | Optional. |
+| `is_ot` | INTEGER NOT NULL DEFAULT 0 | 1 = overtime. SHIFT only (schema v5, FR-12). |
 | `created_at` | TEXT NOT NULL | ISO-8601 UTC. |
 | `updated_at` | TEXT NOT NULL | ISO-8601 UTC. |
 
 Constraints:
 - **No** DB-level `UNIQUE(person_id, work_date)` — the schema allows multiple entries per date, which split shifts now use (PRD FR-10). App logic decides: `apply_entry(mode="replace")` keeps one entry per date ("overwrite" = delete existing rows for that `(person_id, work_date)` then insert, warned — FR-2/FR-4), while `mode="add"` stacks a non-overlapping SHIFT alongside. Composition is enforced by `check_day_composition` in `scheduler/entries.py`, never by a constraint.
-- CHECK: `entry_type IN ('SHIFT','PTO','UTO')`.
-- CHECK: when `entry_type = 'SHIFT'`, `start_time` and `end_time` are NOT NULL.
+- CHECK: `entry_type IN ('SHIFT','PTO','UTO','RD')`.
+- CHECK: `SHIFT` has `start_time` and `end_time`; every other type has neither.
+- CHECK: `is_ot IN (0,1)` and `is_ot = 0 OR entry_type = 'SHIFT'`.
 - Index on `(person_id, work_date)` and on `work_date` for fast week queries / overwrite lookups.
 
 ### `planned_leave`
@@ -59,8 +61,8 @@ constraint — the registry is a plain list; the overlay is idempotent.
 ## Derived concepts
 
 - **Week** = the 7 dates Mon..Sun. Resolved in code from any date via `date - weekday()`.
-- **Copy forward (FR-5):** for each entry in week W, insert/replace into week W+1 at `work_date + 7 days`, all fields identical.
-- **Offset forward (FR-6):** same as copy forward, but for `SHIFT` entries add the offset to `start_time`/`end_time`; recompute `crosses_midnight`. `PTO`/`UTO` unchanged.
+- **Copy forward (FR-5, FR-13):** for each regular SHIFT and RD in week W, insert into week W+1 on the same weekday, fields identical. OT (`is_ot = 1`), PTO and UTO are skipped. A `(person, date)` that held only skipped entries is refilled from the person's standing day (`templates.standing_day`), or left empty and reported. Then the leave overlay runs, all in one transaction.
+- **Offset forward (FR-6, not built yet):** same as copy forward, but add the offset to each carried SHIFT's `start_time`/`end_time` and recompute `crosses_midnight`. Same carry rule (`weeks.is_carried`).
 - **Leave overlay (FR-9):** when a week is built (copy-forward, template-apply, or the manual "apply to a week" action), every `planned_leave` intersecting that week is overlaid: for each `(person_id, date)` it covers, delete the existing `schedule_entry` for that pair then insert the PTO/UTO — the leave wins over the shift. Overlay runs **inside** copy-forward's single transaction. It never appends (one entry/date preserved) and is idempotent, so re-applying is safe. Materialized rows are independent of the registry: deleting a `planned_leave` afterward does not remove days already written.
 
 ## Why this shape
