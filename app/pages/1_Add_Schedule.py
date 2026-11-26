@@ -1,13 +1,15 @@
 """Add schedule (US-2, US-3).
 
 Step 1 — pick a person and the date(s)/week.
-Step 2 — pick the type (Shift / PTO / UTO / RD) and, for shifts, the times.
+Step 2 — pick the type (Shift / OT / PTO / UTO / RD) and, for shifts and
+OT, the times.
 (Per-entry editing/deleting is inline on Home — toggle Edit there.)
 
 Bulk-applies one entry to every selected date; existing entries on those
 dates are listed and require an explicit overwrite confirm (FR-3, FR-4) —
 unless "add a second shift" is chosen, which stacks a split shift onto the
-day instead of replacing it (FR-10).
+day instead of replacing it (FR-10). OT defaults to adding beside the day's
+shift, and replaces a rest day (FR-12).
 """
 
 from __future__ import annotations
@@ -17,7 +19,9 @@ from datetime import date
 import streamlit as st
 
 from _lib import (
+    TYPE_CHOICES,
     get_db,
+    parse_type_choice,
     pick_duration,
     pick_time_12h,
     render_conflicts,
@@ -153,16 +157,20 @@ else:
         f"{', '.join(ss.ae_dates)}"
     )
 
-    etype = st.radio("Type", [e.value for e in EntryType], horizontal=True)
-    entry_type = EntryType(etype)
+    entry_type, is_ot = parse_type_choice(
+        st.radio("Type", TYPE_CHOICES, horizontal=True))
 
     start_str = end_str = None
     add_mode = False
     if entry_type is EntryType.SHIFT:
+        # OT gets its own widget keys so its defaults (after a usual
+        # shift, 2h) don't fight the regular shift's.
+        kp = "ae_ot" if is_ot else "ae"
         st.caption("Start (Pacific)")
-        start_str = pick_time_12h("Hour", "ae_start", "09:00")
+        start_str = pick_time_12h("Hour", f"{kp}_start",
+                                  "17:00" if is_ot else "09:00")
         st.caption("Length")
-        dur = pick_duration("ae_dur", 480)
+        dur = pick_duration(f"{kp}_dur", 120 if is_ot else 480)
         try:
             end_str, crosses = end_from_duration(start_str, dur)
             st.caption(
@@ -172,17 +180,30 @@ else:
         except DomainError as exc:
             end_str = None
             st.warning(str(exc))
-        add_mode = st.radio(
-            "If those dates already have a shift",
-            ["Replace it", "Add a second shift (split day)"],
-            horizontal=True,
-        ).startswith("Add")
-        if add_mode:
-            st.caption(
-                "Keeps what's already there and stacks this shift on top. "
-                "The two shifts must not overlap, and the day can't already "
-                "be PTO/UTO/RD."
-            )
+        if is_ot:
+            add_mode = st.radio(
+                "If those dates already have a shift",
+                ["Add the OT beside it", "Replace the day with the OT"],
+                horizontal=True,
+            ).startswith("Add")
+            if add_mode:
+                st.caption(
+                    "Keeps the day's shift and adds the OT next to it — they "
+                    "must not overlap. On a rest day the OT replaces the RD; "
+                    "a PTO/UTO day can't take OT."
+                )
+        else:
+            add_mode = st.radio(
+                "If those dates already have a shift",
+                ["Replace it", "Add a second shift (split day)"],
+                horizontal=True,
+            ).startswith("Add")
+            if add_mode:
+                st.caption(
+                    "Keeps what's already there and stacks this shift on "
+                    "top. The two shifts must not overlap, and the day "
+                    "can't already be PTO/UTO/RD."
+                )
     note = st.text_input("Note (optional)")
 
     nav_back, nav_save = st.columns([1, 2])
@@ -197,7 +218,7 @@ else:
                 conn, ss.ae_person_id, ss.ae_dates, entry_type,
                 start_time=start_str, end_time=end_str,
                 note=note or None, overwrite=overwrite,
-                mode="add" if add_mode else "replace",
+                mode="add" if add_mode else "replace", is_ot=is_ot,
             )
         set_flash(saved_message("Added" if add_mode else "Saved",
                                 res.created, res.overwritten))

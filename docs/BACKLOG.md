@@ -82,9 +82,10 @@ Derived from the DOD. Each milestone is shippable on its own.
       06:00–10:00 on one date don't falsely collide
 - [x] `update_entry` / `delete_entry` act on a single entry by id, so editing
       half a split day leaves the other half alone (note preserved)
-- [x] Grid cell editor is a slot picker (one slot per entry + "➕ Add a
-      shift"); split days stack in the cell, compact `edit_cell_label` in
-      edit mode; Add Schedule page gained a replace/add choice
+- [x] Grid cell editor: pick the shift ("Which shift?" on a split day),
+      then **Update** it or **➕ Add as another shift**; split
+      days stack in the cell, compact `edit_cell_label` in edit mode; Add
+      Schedule page gained a replace/add choice
 - [x] Templates may list two SHIFT rows for one `(person, weekday)` — first
       replaces the cell, the rest are added alongside
 - [x] No schema change; copy-forward and the leave overlay already handled
@@ -95,6 +96,24 @@ Derived from the DOD. Each milestone is shippable on its own.
 - [x] Tests (`test_split_shifts.py` 39, `test_week_hours.py` 20) — full suite
       171 passes; verified live in the app (split day, overlap rejection,
       3-block day, 40h→47h total)
+
+## M9 — Overtime + copy-forward skips one-offs (FR-12, FR-13) ✅
+- [x] Schema v5: `schedule_entry.is_ot` (SHIFT-only CHECK) — OT is a flagged
+      shift, so overlap/overnight/coverage rules apply unchanged
+- [x] `apply_entry`/`update_entry` take `is_ot`; adding OT to an RD day
+      replaces the RD, PTO/UTO reject it (validated before any write)
+- [x] Grid: brand-blue `⏱ OT` chip with times (wraps in the column, both
+      Manila halves), `OT` in the edit label, "Which shift?" and type picker;
+      **➕ Add as OT** in the cell editor; Add Schedule offers OT (defaults to
+      add-beside, 5 PM · 2h)
+- [x] Hours column splits regular vs OT (`40h` / `+ 4h OT`); coverage chart
+      draws OT faded with a dashed edge; roster order ignores OT
+- [x] Copy-forward carries regular shifts + RD only; OT/PTO/UTO skipped;
+      emptied days refilled from `templates.standing_day`, else reported in
+      `CopyResult.unfilled`; planned leaves overlaid after — one transaction
+- [x] Tests (`test_overtime.py` 26, copy-forward fill 8) — full suite 205
+      passes; verified live (OT chips, hours split, chart, copy result
+      "32 copied · 5 left out · 3 set from standing schedule")
 
 ## PRD §11 open questions — all resolved (see PRD §11)
 1. Week start: **Monday** · 2. Timezone: **Pacific base + Manila view**

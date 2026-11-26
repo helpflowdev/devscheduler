@@ -1,17 +1,20 @@
 """Week math and weekday-preserving roll-forward.
 
-The week starts Monday (PRD §11.1). ``copy_week`` copies a week's entries
-into the next week, unchanged (FR-5).
+The week starts Monday (PRD §11.1). ``copy_week`` carries a week's regular
+pattern into another week (FR-5, as amended by FR-13): one-off exceptions —
+OT, PTO, UTO — are not carried, and a day left empty by dropping them is
+refilled from the person's standing schedule.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from scheduler.config import DAY_NAMES  # noqa: F401  (re-exported)
 from scheduler.db import Connection
 from scheduler.errors import OverwriteRequiredError, ValidationError
+from scheduler.models import EntryType
 from scheduler.util import in_placeholders, now_iso
 
 
@@ -42,9 +45,20 @@ def iso(d: date) -> str:
 
 @dataclass(slots=True)
 class CopyResult:
-    copied: int  # entries written into the destination week
+    copied: int  # source entries carried into the destination week
     overwritten: int  # destination entries removed first
     leaves_applied: int = 0  # planned-leave days overlaid onto the copy
+    skipped: int = 0  # source OT/PTO/UTO entries not carried
+    filled: int = 0  # days refilled from the standing schedule
+    # Days that were skipped-only with no standing day to fall back on, so
+    # they're left empty: (person name, "YYYY-MM-DD") in the destination.
+    unfilled: list[tuple[str, str]] = field(default_factory=list)
+
+
+def is_carried(entry_type: str, is_ot: bool) -> bool:
+    """Does copy-forward carry this entry? Regular shifts and RD are the
+    standing pattern; OT, PTO and UTO are one-off exceptions (FR-13)."""
+    return not is_ot and entry_type not in ("PTO", "UTO")
 
 
 def _to_min(hhmm: str) -> int:
@@ -87,10 +101,20 @@ def _copy_core(
     src_any_date: str | date,
     dst_any_date: str | date,
     overwrite: bool,
+    template,
 ) -> CopyResult:
-    # Local imports break the weeks↔entries / weeks↔leaves module cycles.
-    from scheduler.entries import find_conflicts, insert_entry
+    # Local imports break the weeks↔entries / weeks↔leaves /
+    # weeks↔templates module cycles.
+    from scheduler.entries import (
+        find_conflicts,
+        insert_entry,
+        validate_shift_times,
+    )
     from scheduler.leaves import overlay_leaves
+    from scheduler.templates import DEFAULT_TEMPLATE, standing_day
+
+    if template is None:
+        template = DEFAULT_TEMPLATE
 
     src_mon = monday_of(src_any_date)
     dst_mon = monday_of(dst_any_date)
@@ -112,9 +136,29 @@ def _copy_core(
     if conflicts and not overwrite:
         raise OverwriteRequiredError(conflicts)
 
+    # Split the source into what carries and the cells that lose everything
+    # (a PTO/UTO day, or an OT-only rest day) — those get the standing day.
+    carried = [r for r in src_rows
+               if is_carried(r["entry_type"], bool(r["is_ot"]))]
+    kept_cells = {(r["person_id"], r["work_date"]) for r in carried}
+    emptied = sorted({(r["person_id"], r["work_date"]) for r in src_rows}
+                     - kept_cells)
+    names: dict[int, str] = {}
+    if emptied:
+        pids = sorted({pid for pid, _ in emptied})
+        names = {r["id"]: r["name"] for r in conn.execute(
+            f"SELECT id, name FROM person "
+            f"WHERE id IN ({in_placeholders(len(pids))})", pids,
+        ).fetchall()}
+
+    def dst_iso(src_iso: str) -> str:
+        return iso(dst_mon + (date.fromisoformat(src_iso) - src_mon))
+
     now = now_iso()
     overwritten = 0
     leaves_applied = 0
+    filled = 0
+    unfilled: list[tuple[str, str]] = []
     try:
         if overwrite:
             cur = conn.execute(
@@ -123,17 +167,32 @@ def _copy_core(
                 dst_dates,
             )
             overwritten = cur.rowcount
-        for r in src_rows:
-            shift_days = (date.fromisoformat(r["work_date"]) - src_mon).days
+        for r in carried:
             insert_entry(
                 conn,
                 person_id=r["person_id"],
-                work_date=iso(dst_mon + timedelta(days=shift_days)),
+                work_date=dst_iso(r["work_date"]),
                 entry_type=r["entry_type"],
                 start_time=r["start_time"], end_time=r["end_time"],
                 crosses_midnight=r["crosses_midnight"],
                 note=r["note"], now=now,
             )
+        for pid, src_iso in emptied:
+            name = names.get(pid, f"#{pid}")
+            weekday = date.fromisoformat(src_iso).weekday()
+            rows = standing_day(name, weekday, template)
+            if not rows:
+                unfilled.append((name, dst_iso(src_iso)))
+                continue
+            for etype, start, end in rows:
+                crosses = (validate_shift_times(start, end)
+                           if etype is EntryType.SHIFT else False)
+                insert_entry(
+                    conn, person_id=pid, work_date=dst_iso(src_iso),
+                    entry_type=etype.value, start_time=start, end_time=end,
+                    crosses_midnight=int(crosses), note=None, now=now,
+                )
+            filled += 1
         # Advance-filed leaves win over the copied shift on their dates.
         leaves_applied = overlay_leaves(conn, dst_dates, now=now)
         conn.commit()
@@ -142,9 +201,12 @@ def _copy_core(
         raise
 
     return CopyResult(
-        copied=len(src_rows),
+        copied=len(carried),
         overwritten=overwritten,
         leaves_applied=leaves_applied,
+        skipped=len(src_rows) - len(carried),
+        filled=filled,
+        unfilled=unfilled,
     )
 
 
@@ -154,14 +216,21 @@ def copy_week(
     dst_any_date: str | date,
     *,
     overwrite: bool = False,
+    template=None,
 ) -> CopyResult:
-    """Exact copy of the source week into the destination week (FR-5).
+    """Carry the source week's regular pattern into the destination week
+    (FR-5, amended by FR-13).
 
-    Weekday-preserving (Mon→Mon, …), single transaction. Existing
-    destination entries raise :class:`OverwriteRequiredError` unless
-    ``overwrite`` clears the destination week first (PRD §9).
+    Weekday-preserving (Mon→Mon, …), single transaction. Regular shifts and
+    RD copy as-is; OT, PTO and UTO are one-offs and are **not** carried.
+    A day that held only those is refilled from the person's standing day
+    in ``template`` (default: :data:`scheduler.templates.DEFAULT_TEMPLATE`)
+    or left empty and reported in ``unfilled``. Planned leaves are then
+    overlaid, so next week's real PTO/UTO comes from the leave registry.
+    Existing destination entries raise :class:`OverwriteRequiredError`
+    unless ``overwrite`` clears the destination week first (PRD §9).
     """
-    return _copy_core(conn, src_any_date, dst_any_date, overwrite)
+    return _copy_core(conn, src_any_date, dst_any_date, overwrite, template)
 
 
 def clear_week(conn: Connection, any_date_in_week) -> int:

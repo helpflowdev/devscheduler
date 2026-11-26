@@ -50,6 +50,10 @@ class Entry:
     `start_time` / `end_time` are "HH:MM" strings and are required iff
     `entry_type == EntryType.SHIFT`. Manila time is never stored here — it is
     computed for display by `scheduler.tz`.
+
+    ``is_ot`` marks a SHIFT as overtime (FR-12). OT is a shift in every
+    mechanical sense — times, overlap, overnight, coverage — and only
+    differs in how it is labelled, counted, and carried forward.
     """
 
     person_id: int
@@ -59,6 +63,7 @@ class Entry:
     end_time: str | None = None  # "HH:MM" Pacific, SHIFT only
     crosses_midnight: bool = False
     note: str | None = None
+    is_ot: bool = False  # overtime SHIFT; never set on PTO/UTO/RD
     created_at: str | None = None
     updated_at: str | None = None
     id: int | None = None
@@ -75,6 +80,7 @@ class Entry:
             end_time=row["end_time"],
             crosses_midnight=bool(row["crosses_midnight"]),
             note=row["note"],
+            is_ot=bool(row["is_ot"]) if "is_ot" in keys else False,
             created_at=row["created_at"] if "created_at" in keys else None,
             updated_at=row["updated_at"] if "updated_at" in keys else None,
         )

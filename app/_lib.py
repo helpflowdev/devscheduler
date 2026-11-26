@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import re
 import sys
 import time
 from contextlib import contextmanager
@@ -42,12 +43,14 @@ def _bridge_secrets() -> None:
 
 _bridge_secrets()
 
+from sqlalchemy.exc import OperationalError  # noqa: E402
+
 from scheduler.db import connect  # noqa: E402
 from scheduler.models import Entry, EntryType  # noqa: E402
 from scheduler.timefmt import range_12h  # noqa: E402
 
 # Bump on each deploy so a stale Streamlit Cloud build is obvious.
-BUILD = "2026-05-19 · b22 · Manila view splits across days"
+BUILD = "2026-11-26 · b25 · OT entries; copy skips OT/PTO/UTO"
 
 _FLASH_KEY = "_flash"
 
@@ -60,12 +63,30 @@ BRAND = {
     "sky": "#C3EDFF",
     "navy": "#111229",
 }
-# Entry-type → (background, text) chips.
+# Entry-type → (background, text) chips. OT takes the one saturated brand
+# color so it stands apart from the pastel days-off chips.
 TYPE_STYLE = {
     "PTO": (BRAND["peach"], BRAND["navy"]),
     "UTO": (BRAND["lavender"], BRAND["navy"]),
     "RD": (BRAND["sky"], BRAND["navy"]),
+    "OT": (BRAND["blue"], "#FFFFFF"),
 }
+
+# What the type pickers offer. "OT" isn't an EntryType — it's a SHIFT with
+# is_ot set (FR-12) — so pickers go through these two helpers.
+TYPE_CHOICES = ["SHIFT", "OT", "PTO", "UTO", "RD"]
+
+
+def parse_type_choice(choice: str) -> tuple[EntryType, bool]:
+    """Picker value → ``(entry_type, is_ot)``."""
+    if choice == "OT":
+        return EntryType.SHIFT, True
+    return EntryType(choice), False
+
+
+def type_choice_of(e: Entry) -> str:
+    """An entry's picker value — the inverse of :func:`parse_type_choice`."""
+    return "OT" if e.is_ot else e.entry_type.value
 
 
 def badge(text: str, bg: str, fg: str) -> str:
@@ -77,9 +98,41 @@ def badge(text: str, bg: str, fg: str) -> str:
     )
 
 
+_DB_HELP = """
+The app started, but the database in `DATABASE_URL` refused the
+connection. Usual causes, in order:
+
+1. **Supabase project is paused** — free projects pause after ~7 days
+   idle. Open the Supabase dashboard and hit **Restore**.
+2. **Direct connection used** — `db.<ref>.supabase.co` is IPv6-only and
+   Streamlit Cloud is IPv4-only. Use the **Session pooler** URI instead
+   (`...pooler.supabase.com:5432`, user `postgres.<project-ref>`).
+3. **Bad password** — re-copy it and percent-encode any `@ : / ?`.
+"""
+
+
+def _scrub(msg: str) -> str:
+    """Strip any user:password@ pair out of a driver error message."""
+    return re.sub(r"://[^/\s]*:[^/\s]*@", "://***:***@", msg)
+
+
+def _db_unreachable(exc: Exception) -> None:
+    """Explain a failed connect instead of Streamlit's redacted traceback."""
+    st.error("Can't reach the database.")
+    st.markdown(_DB_HELP)
+    lines = str(exc).strip().splitlines()
+    if lines:
+        with st.expander("Driver message"):
+            st.code(_scrub(lines[0]))
+    st.stop()
+
+
 @contextmanager
 def get_db():
-    conn = connect()
+    try:
+        conn = connect()
+    except OperationalError as exc:
+        _db_unreachable(exc)
     try:
         yield conn
     finally:
@@ -226,7 +279,8 @@ def entries_phrase(n: int) -> str:
 def entry_detail(e: Entry) -> str:
     """How an existing entry reads in a conflict list (12-hour)."""
     if e.entry_type is EntryType.SHIFT:
-        return range_12h(e.start_time, e.end_time)
+        rng = range_12h(e.start_time, e.end_time)
+        return f"OT {rng}" if e.is_ot else rng
     return e.entry_type.value
 
 

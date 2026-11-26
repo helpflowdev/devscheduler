@@ -44,9 +44,12 @@ v1 has a single trust level — everyone using the instance can edit. No login.
 | **Shift** | A working time block on a date: start time → end time. |
 | **PTO** | Paid Time Off — a full day off, paid. No times entered. |
 | **UTO** | Unpaid Time Off — a full day off, unpaid. No times entered. |
+| **RD** | Rest Day — a scheduled day off (not leave). No times entered. |
+| **OT** | Overtime — a timed block of extra work, stored as a Shift flagged OT. Shown with an OT label; counted separately in weekly hours. |
+| **Standing schedule** | Each person's usual week (the default template). Copy-forward uses it to refill days whose only entries were skipped. |
 | **Entry** | One row: a person + a date + a type (Shift / PTO / UTO). |
 | **Week** | Mon–Sun, anchored by the Monday date (week starts **Monday**). |
-| **Copy forward** | Duplicate every entry of week W into week W+1, unchanged. |
+| **Copy forward** | Carry week W's regular shifts and rest days into week W+1. OT/PTO/UTO are one-offs and are not carried (FR-13). |
 | **Offset / slide** | Copy a week forward and shift every Shift's start/end by ±H:MM. |
 
 ## 5. User Stories & Acceptance Criteria
@@ -78,14 +81,14 @@ v1 has a single trust level — everyone using the instance can edit. No login.
 ### US-4 — Keep the same schedule next week (DOD: keep same sched)
 *As a scheduler I want to copy this week into next week unchanged.*
 
-- From the viewer, "Copy week → next week" duplicates all entries.
+- From the viewer, "Copy week → next week" carries regular shifts and rest days. OT, PTO and UTO are not carried. A day that held only those gets the person's standing schedule (or is left empty and reported), then planned leaves are applied (FR-13).
 - Warn before overwriting a target week that already has entries; require confirm.
 
 ### US-5 — Adjust next week (slide/offset) (DOD: shift/offset)
 *As a scheduler I want to forward a week with all shifts slid by an offset.*
 
 - Choose source week, target week, and an offset (e.g. `+1:00`, `-0:30`).
-- Only **Shift** entries are offset; PTO/UTO copy unchanged.
+- Only regular **Shift** entries are offset; OT/PTO/UTO are not carried (same rule as FR-13).
 - Preview the resulting week before applying.
 
 ## 6. Functional Requirements
@@ -94,13 +97,15 @@ v1 has a single trust level — everyone using the instance can edit. No login.
 - FR-2 Entries: one entry per person per date by default (overwrite-warned). A day may also hold several **non-overlapping** SHIFT entries — see FR-10. No schema change was needed; the schema always permitted multiple entries per date.
 - FR-3 Bulk apply across multiple selected dates / a full week.
 - FR-4 Overwrite protection: warn + confirm before replacing existing entries.
-- FR-5 Copy week forward (exact).
+- FR-5 Copy week forward — regular shifts and RD; one-offs skipped per FR-13.
 - FR-6 Copy week forward with Shift offset; preview required.
 - FR-7 Week navigation by relative (prev/next) and absolute (date jump).
 - FR-8 Times are stored as wall-clock in the **base timezone Pacific (`America/Los_Angeles`, "PST/PDT")**. The viewer offers a **Manila (`Asia/Manila`) conversion view** toggle that converts each entry using its own `work_date` (so Pacific DST is handled correctly per date).
 - FR-9 Planned leaves: advance PTO/UTO registry, overlaid whenever a week is built. See [FR-002](feature_requests/FR-002-planned-leaves.md).
 - FR-10 Split shifts: a person may have several non-overlapping SHIFTs on one date, each editable and deletable on its own. Whole-day PTO/UTO/RD stay exclusive. See [FR-003](feature_requests/FR-003-split-shifts.md).
-- FR-11 Weekly hours: the grid shows each person's total scheduled shift hours for the displayed week beside their name, recomputed on every render.
+- FR-11 Weekly hours: the grid shows each person's total scheduled shift hours for the displayed week beside their name, recomputed on every render. OT is shown separately (`40h + 4h OT`).
+- FR-12 Overtime: a shift can be marked **OT**. It follows every shift rule, is added beside the day's shift (or replaces an RD), and shows as a labelled chip with its times. See [FR-004](feature_requests/FR-004-overtime-and-copy-rules.md).
+- FR-13 Copy-forward skips one-offs: OT, PTO and UTO are not carried. Days left empty are refilled from the standing schedule, then planned leaves are overlaid. See [FR-004](feature_requests/FR-004-overtime-and-copy-rules.md).
 
 ## 7. Data Model (summary)
 

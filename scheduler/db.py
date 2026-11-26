@@ -29,7 +29,7 @@ DEFAULT_DB_PATH = Path(
     )
 )
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Per-dialect migration statements (each a list of single statements).
 _MIGRATIONS: list[dict[str, list[str]]] = [
@@ -238,6 +238,23 @@ _MIGRATIONS: list[dict[str, list[str]]] = [
                 ON planned_leave(person_id)""",
         ],
     },
+    # --- v5: is_ot — overtime flag on a SHIFT (FR-12) ----------------------
+    # OT is a shift with a different label, so it's a flag rather than a new
+    # entry_type: no table rebuild, and every shift rule (times, overlap,
+    # overnight, coverage) applies to it unchanged.
+    {
+        "sqlite": [
+            """ALTER TABLE schedule_entry ADD COLUMN is_ot INTEGER NOT NULL
+                DEFAULT 0 CHECK (is_ot IN (0, 1)
+                                 AND (is_ot = 0 OR entry_type = 'SHIFT'))""",
+        ],
+        "postgresql": [
+            """ALTER TABLE schedule_entry ADD COLUMN is_ot SMALLINT NOT NULL
+                DEFAULT 0 CHECK (is_ot IN (0, 1))""",
+            """ALTER TABLE schedule_entry ADD CONSTRAINT ck_entry_ot_shift
+                CHECK (is_ot = 0 OR entry_type = 'SHIFT')""",
+        ],
+    },
 ]
 
 _engines: dict[str, Engine] = {}
@@ -267,7 +284,15 @@ def _get_engine(url: str) -> Engine:
             # NullPool: a fresh DBAPI connection per use and closed on
             # release — matches the connect-per-interaction design and
             # frees SQLite file handles promptly (Windows/tests).
-            eng = create_engine(url, poolclass=NullPool, future=True)
+            kwargs = {}
+            if url.startswith("postgresql"):
+                # Fail fast on an unreachable host (paused Supabase project,
+                # IPv6-only direct connection) instead of hanging the page
+                # until the OS TCP timeout.
+                kwargs["connect_args"] = {"connect_timeout": 10}
+            eng = create_engine(
+                url, poolclass=NullPool, future=True, **kwargs
+            )
             if eng.dialect.name == "sqlite":
                 @event.listens_for(eng, "connect")
                 def _fk_on(dbapi_conn, _rec):  # enforce FKs on SQLite

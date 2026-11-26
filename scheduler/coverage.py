@@ -35,6 +35,7 @@ class Segment:
     end_min: int            # > start_min
     label: str              # 12-hour range of the *whole* shift
     length: str = ""        # whole-shift duration, e.g. "8h"
+    is_ot: bool = False     # overtime block — drawn distinctly
 
 
 def week_shift_segments(
@@ -53,13 +54,18 @@ def week_shift_segments(
         person = name_by_id.get(e.person_id, f"#{e.person_id}")
         s, t = _to_min(e.start_time), _to_min(e.end_time)
         label = range_12h(e.start_time, e.end_time)
+        if e.is_ot:
+            label = f"OT {label}"
         length = _length_label(s, t)
+        ot = e.is_ot
         if e.crosses_midnight or t <= s:
-            segs.append(Segment(person, e.work_date, s, 1440, label, length))
+            segs.append(Segment(person, e.work_date, s, 1440, label, length,
+                                ot))
             if t > 0:
-                segs.append(Segment(person, e.work_date, 0, t, label, length))
+                segs.append(Segment(person, e.work_date, 0, t, label, length,
+                                    ot))
         else:
-            segs.append(Segment(person, e.work_date, s, t, label, length))
+            segs.append(Segment(person, e.work_date, s, t, label, length, ot))
     return segs
 
 
@@ -78,16 +84,20 @@ def peak_overlap(segments: list[Segment], work_date: str) -> int:
     return peak
 
 
-def week_minutes_by_person(entries: list[Entry]) -> dict[int, int]:
+def week_minutes_by_person(
+    entries: list[Entry], *, ot: bool = False
+) -> dict[int, int]:
     """Total scheduled SHIFT minutes per ``person_id`` across ``entries``.
 
-    A split day sums its blocks; PTO/UTO/RD carry no hours and contribute
-    nothing. The figure is timezone-independent — a shift is the same
-    length in Pacific and Manila — so the same total serves both views.
+    Regular shifts by default; ``ot=True`` totals the OT blocks instead,
+    so the grid can show "40h + 2h OT" (FR-12). A split day sums its
+    blocks; PTO/UTO/RD carry no hours and contribute nothing. The figure is
+    timezone-independent — a shift is the same length in Pacific and
+    Manila — so the same total serves both views.
     """
     totals: dict[int, int] = {}
     for e in entries:
-        if e.entry_type is not EntryType.SHIFT:
+        if e.entry_type is not EntryType.SHIFT or e.is_ot != ot:
             continue
         totals[e.person_id] = totals.get(e.person_id, 0) + duration_minutes(
             e.start_time, e.end_time, e.crosses_midnight

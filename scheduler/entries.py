@@ -23,14 +23,14 @@ from scheduler.weeks import iso, week_dates
 _INSERT_SQL = (
     "INSERT INTO schedule_entry"
     "(person_id, work_date, entry_type, start_time, end_time,"
-    " crosses_midnight, note, created_at, updated_at) "
-    "VALUES (?,?,?,?,?,?,?,?,?)"
+    " crosses_midnight, note, is_ot, created_at, updated_at) "
+    "VALUES (?,?,?,?,?,?,?,?,?,?)"
 )
 
 _UPDATE_SQL = (
     "UPDATE schedule_entry SET entry_type = ?, start_time = ?, "
-    "end_time = ?, crosses_midnight = ?, note = ?, updated_at = ? "
-    "WHERE id = ?"
+    "end_time = ?, crosses_midnight = ?, note = ?, is_ot = ?, "
+    "updated_at = ? WHERE id = ?"
 )
 
 
@@ -45,11 +45,12 @@ def insert_entry(
     crosses_midnight: int,
     note: str | None,
     now: str,
+    is_ot: int = 0,
 ) -> None:
     """Single place that knows the schedule_entry column list."""
     conn.execute(_INSERT_SQL, (
         person_id, work_date, entry_type, start_time, end_time,
-        crosses_midnight, note, now, now,
+        crosses_midnight, note, int(is_ot), now, now,
     ))
 
 
@@ -71,15 +72,16 @@ def order_by_shift_start(
     """Roster order: earliest shift-start first, then whole-day/none,
     name as the tiebreaker.
 
-    Each person gets the minimum SHIFT start time across the week's
-    entries; people with no shift sort after those who do.
+    Each person gets the minimum regular SHIFT start time across the
+    week's entries; people with no shift sort after those who do. OT is
+    ignored so a one-off early OT block doesn't reshuffle the roster.
     """
     earliest: dict[int, int] = {}
     for e in entries:
         # Value compare (not enum identity) so this can't silently no-op
         # across environments/enum quirks.
         is_shift = getattr(e.entry_type, "value", e.entry_type) == "SHIFT"
-        if is_shift and e.start_time:
+        if is_shift and not e.is_ot and e.start_time:
             h, m = e.start_time.split(":")
             mins = int(h) * 60 + int(m)
             cur = earliest.get(e.person_id)
@@ -183,12 +185,19 @@ def shift_span(start: str, end: str) -> tuple[int, int]:
 
 
 def _normalize_times(
-    entry_type: EntryType, start_time: str | None, end_time: str | None
+    entry_type: EntryType,
+    start_time: str | None,
+    end_time: str | None,
+    is_ot: bool = False,
 ) -> tuple[str | None, str | None, bool]:
     """Validate times against the type; return ``(start, end, crosses)``.
 
-    SHIFT needs both times; the whole-day types must have neither.
+    SHIFT (regular or OT) needs both times; the whole-day types must have
+    neither, and only a SHIFT can be OT.
     """
+    if is_ot and entry_type is not EntryType.SHIFT:
+        raise ValidationError(
+            f"Only a shift can be OT — {entry_type.value} has no hours.")
     if entry_type is EntryType.SHIFT:
         if not start_time or not end_time:
             raise ValidationError("A shift needs both a start and end time.")
@@ -293,6 +302,7 @@ def apply_entry(
     note: str | None = None,
     overwrite: bool = False,
     mode: str = "replace",
+    is_ot: bool = False,
 ) -> ApplyResult:
     """Apply one entry to every date in ``dates`` (FR-3) in one transaction.
 
@@ -305,6 +315,10 @@ def apply_entry(
     split shift (FR-10). There is no overwrite prompt; instead every target
     date is checked by :func:`check_day_composition` **before** anything is
     written, so an illegal date fails the whole apply rather than half of it.
+
+    ``is_ot`` marks the SHIFT as overtime (FR-12). Adding OT to a rest day
+    **replaces the RD** — working your rest day is what OT there means —
+    while a PTO/UTO day still rejects it.
     """
     if not dates:
         raise ValidationError("Select at least one date.")
@@ -317,15 +331,19 @@ def apply_entry(
         raise NotFoundError(f"No person with id {person_id}.")
 
     start_time, end_time, crosses = _normalize_times(
-        entry_type, start_time, end_time
+        entry_type, start_time, end_time, is_ot
     )
 
     existing = find_conflicts(conn, dates, person_id)
+    rest_days: set[str] = set()  # RD days this OT will replace
     if mode == "add":
         for d in dates:
-            check_day_composition(
-                existing.get(d, []), entry_type, start_time, end_time
-            )
+            day = existing.get(d, [])
+            if is_ot and day and all(
+                    e.entry_type is EntryType.RD for e in day):
+                rest_days.add(d)
+                continue
+            check_day_composition(day, entry_type, start_time, end_time)
     elif existing and not overwrite:
         raise OverwriteRequiredError(existing)
 
@@ -334,7 +352,7 @@ def apply_entry(
     overwritten = 0
     try:
         for d in dates:
-            if replacing:
+            if replacing or d in rest_days:
                 cur = conn.execute(
                     "DELETE FROM schedule_entry "
                     "WHERE person_id = ? AND work_date = ?",
@@ -345,7 +363,7 @@ def apply_entry(
                 conn, person_id=person_id, work_date=d,
                 entry_type=entry_type.value, start_time=start_time,
                 end_time=end_time, crosses_midnight=int(crosses),
-                note=note, now=now,
+                note=note, now=now, is_ot=int(is_ot),
             )
         conn.commit()
     except Exception:
@@ -373,17 +391,19 @@ def update_entry(
     start_time: str | None = None,
     end_time: str | None = None,
     note: str | None = None,
+    is_ot: bool = False,
 ) -> None:
     """Edit one entry in place, leaving the day's other entries alone.
 
     Needed once a day can hold a split shift: the old "overwrite the whole
     cell" edit would take the sibling shift with it. The change is checked
     against the day's *other* entries, so an edit can't be used to sneak
-    past the no-overlap rule.
+    past the no-overlap rule. ``is_ot`` is set as given, so an edit can
+    turn a shift into OT or back.
     """
     current = get_entry(conn, entry_id)
     start_time, end_time, crosses = _normalize_times(
-        entry_type, start_time, end_time
+        entry_type, start_time, end_time, is_ot
     )
     siblings = [
         e for e in day_entries(conn, current.person_id, current.work_date)
@@ -394,7 +414,7 @@ def update_entry(
     try:
         conn.execute(_UPDATE_SQL, (
             entry_type.value, start_time, end_time, int(crosses),
-            note, now_iso(), entry_id,
+            note, int(is_ot), now_iso(), entry_id,
         ))
         conn.commit()
     except Exception:
